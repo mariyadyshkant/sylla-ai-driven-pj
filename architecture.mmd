@@ -1,0 +1,36 @@
+flowchart LR
+  App["Electron App Shell"]
+  UI["UI: HTML/Tailwind/Alpine.js"]
+  Main["Electron Main Process / Node.js"]
+  DB["SQLite (better-sqlite3)"]
+  Whisper["whisper.cpp + ffmpeg"]
+  AI["API AI esterna opzionale"]
+  Storage["Local filesystem"]
+
+  App --> UI
+  App --> Main
+  Main --> DB
+  Main --> Storage
+  Main --> Whisper
+  Main --> AI
+  UI --> Main
+  UI --> Whisper
+  UI --> DB
+
+  subgraph Desktop App
+    App
+    UI
+    Main
+  end
+
+  subgraph Local Processing
+    Whisper
+    Storage
+  end
+
+  subgraph External Services
+    AI
+  end
+
+  DB --> Storage
+  Whisper --> Storage
