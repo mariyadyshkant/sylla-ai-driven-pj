@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sylla</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  </head>
+  <body class="bg-slate-100 text-slate-900">
+    <div
+      x-data="{
+        view: 'dashboard',
+        selectedCourse: null,
+        courses: [
+          { id: 1, name: 'Corso A' },
+          { id: 2, name: 'Corso B' }
+        ],
+        menu: 'dashboard'
+      }"
+      class="min-h-screen flex"
+    >
+      <aside class="w-72 bg-white border-r border-slate-200 flex flex-col">
+        <div class="p-6 border-b border-slate-200">
+          <h1 class="text-2xl font-semibold">Sylla</h1>
+          <p class="mt-2 text-sm text-slate-500">Tracciamento lezioni</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">I miei corsi</h2>
+              <button
+                @click="view = 'addCourse'; menu = 'dashboard'"
+                class="text-xs font-semibold text-white bg-slate-900 px-3 py-1 rounded"
+              >
+                + Aggiungi
+              </button>
+            </div>
+
+            <template x-for="course in courses" :key="course.id">
+              <button
+                @click="selectedCourse = course; view = 'courseDetails'; menu = 'dashboard'"
+                :class="selectedCourse && selectedCourse.id === course.id ? 'bg-slate-100' : ''"
+                class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100"
+              >
+                <div class="font-medium" x-text="course.name"></div>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 space-y-2">
+          <button
+            @click="view = 'dashboard'; menu = 'dashboard'"
+            :class="menu === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'"
+            class="w-full px-4 py-3 rounded-lg"
+          >
+            Dashboard
+          </button>
+          <button
+            @click="view = 'archive'; menu = 'archive'"
+            :class="menu === 'archive' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'"
+            class="w-full px-4 py-3 rounded-lg"
+          >
+            Archivio
+          </button>
+          <button
+            @click="view = 'settings'; menu = 'settings'"
+            :class="menu === 'settings' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'"
+            class="w-full px-4 py-3 rounded-lg"
+          >
+            Impostazioni
+          </button>
+        </div>
+      </aside>
+
+      <main class="flex-1 p-8">
+        <template x-if="view === 'dashboard'">
+          <section>
+            <div class="mb-6">
+              <h2 class="text-3xl font-semibold">Dashboard</h2>
+              <p class="text-slate-500 mt-2">Panoramica generale delle lezioni e del calendario.</p>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">Calendario mensile placeholder</div>
+              <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">Agenda settimanale placeholder</div>
+            </div>
+          </section>
+        </template>
+
+        <template x-if="view === 'courseDetails'">
+          <section>
+            <h2 class="text-3xl font-semibold">Dettagli corso</h2>
+            <p class="text-slate-500 mt-2" x-text="selectedCourse ? selectedCourse.name : 'Nessun corso selezionato'"></p>
+          </section>
+        </template>
+
+        <template x-if="view === 'archive'">
+          <section>
+            <h2 class="text-3xl font-semibold">Archivio</h2>
+            <p class="text-slate-500 mt-2">Corsi archiviati e consultazione cronologica.</p>
+          </section>
+        </template>
+
+        <template x-if="view === 'settings'">
+          <section>
+            <h2 class="text-3xl font-semibold">Impostazioni</h2>
+            <p class="text-slate-500 mt-2">Preferenze trascrizione, AI e personalizzazione.</p>
+          </section>
+        </template>
+
+        <template x-if="view === 'addCourse'">
+          <section>
+            <h2 class="text-3xl font-semibold">Aggiungi corso</h2>
+            <p class="text-slate-500 mt-2">Form per creare un nuovo corso.</p>
+          </section>
+        </template>
+      </main>
+    </div>
+  </body>
+</html>

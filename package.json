@@ -1,0 +1,14 @@
+{
+  "name": "sylla-ai-driven-pj",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop app per tracciare le lezioni dei corsi",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^26.0.0"
+  }
+}
