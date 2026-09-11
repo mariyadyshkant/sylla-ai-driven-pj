@@ -5,119 +5,514 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sylla</title>
+    <style>[x-cloak] { display: none !important; }</style>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="renderer.js" defer></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   </head>
-  <body class="bg-slate-100 text-slate-900">
-    <div
-      x-data="{
-        view: 'dashboard',
-        selectedCourse: null,
-        courses: [
-          { id: 1, name: 'Corso A' },
-          { id: 2, name: 'Corso B' }
-        ],
-        menu: 'dashboard'
-      }"
-      class="min-h-screen flex"
-    >
-      <aside class="w-72 bg-white border-r border-slate-200 flex flex-col">
-        <div class="p-6 border-b border-slate-200">
-          <h1 class="text-2xl font-semibold">Sylla</h1>
-          <p class="mt-2 text-sm text-slate-500">Tracciamento lezioni</p>
+  <body class="min-h-screen bg-[#e8edea] text-slate-900" x-data="app()" x-init="init()">
+    <div class="min-h-screen flex flex-col">
+      <header
+        class="border-b border-slate-200 px-8 py-5 shadow-sm bg-white/90 bg-cover bg-center"
+        :style="settings.header_image ? `background-image: linear-gradient(rgba(255,255,255,.72),rgba(255,255,255,.72)), url(${settings.header_image})` : ''"
+      >
+        <p class="text-xs uppercase tracking-[0.35em] text-slate-500">Sylla</p>
+        <h1 class="mt-1 text-3xl font-semibold text-slate-900">Tracciamento lezioni</h1>
+      </header>
+
+      <div class="flex flex-1 min-h-0">
+        <aside class="w-80 bg-[#f4f5f2] border-r border-slate-200 shadow-sm flex flex-col">
+          <div class="px-6 pt-8 pb-4">
+            <p class="text-xs uppercase tracking-[0.35em] text-slate-500 mb-4">I miei corsi</p>
+
+            <div class="space-y-2">
+              <template x-for="course in courses" :key="course.id">
+                <div>
+                  <button
+                    @click="toggleSubmenu(course)"
+                    :class="submenuOpenId === course.id ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'"
+                    class="w-full text-left rounded-2xl px-5 py-3 shadow-sm border border-slate-200 transition text-sm font-semibold"
+                  >
+                    <span x-text="course.name"></span>
+                  </button>
+                  <div x-show="submenuOpenId === course.id" class="mt-1 ml-3 space-y-1" x-cloak>
+                    <button
+                      @click="selectCourse(course, 'courseDetails')"
+                      class="block w-full text-left px-4 py-2 text-sm rounded-lg hover:bg-white"
+                      :class="view === 'courseDetails' && selectedCourse && selectedCourse.id === course.id ? 'font-semibold text-slate-900' : 'text-slate-600'"
+                    >Dettagli</button>
+                    <button
+                      @click="selectCourse(course, 'courseLessons')"
+                      class="block w-full text-left px-4 py-2 text-sm rounded-lg hover:bg-white"
+                      :class="view === 'courseLessons' && selectedCourse && selectedCourse.id === course.id ? 'font-semibold text-slate-900' : 'text-slate-600'"
+                    >Lezioni</button>
+                    <button
+                      @click="selectCourse(course, 'courseCalendar')"
+                      class="block w-full text-left px-4 py-2 text-sm rounded-lg hover:bg-white"
+                      :class="view === 'courseCalendar' && selectedCourse && selectedCourse.id === course.id ? 'font-semibold text-slate-900' : 'text-slate-600'"
+                    >Calendario</button>
+                  </div>
+                </div>
+              </template>
+              <p x-show="courses.length === 0" class="text-sm text-slate-400 px-2">Nessun corso ancora.</p>
+            </div>
+          </div>
+
+          <div class="mt-auto px-6 pb-8">
+            <button
+              @click="openAddCourse()"
+              class="mb-4 flex w-full items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800"
+            >
+              + Aggiungi corso
+            </button>
+
+            <div class="space-y-3">
+              <button
+                @click="goDashboard()"
+                :class="menu === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'"
+                class="w-full rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm border border-slate-200"
+              >Dashboard</button>
+              <button
+                @click="goArchive()"
+                :class="menu === 'archive' ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'"
+                class="w-full rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm border border-slate-200"
+              >Archivio</button>
+              <button
+                @click="goSettings()"
+                :class="menu === 'settings' ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'"
+                class="w-full rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm border border-slate-200"
+              >Impostazioni</button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto px-8 py-8 space-y-8" data-view-root>
+
+          <!-- Dashboard -->
+          <template x-if="view === 'dashboard'">
+            <section class="space-y-8" data-view="dashboard">
+              <div>
+                <h2 class="text-3xl font-semibold">Dashboard</h2>
+                <p class="text-slate-500 mt-2">Panoramica generale delle lezioni e del calendario.</p>
+              </div>
+
+              <article class="rounded-[40px] bg-white p-8 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-6">
+                  <h3 class="text-2xl font-semibold text-slate-900 capitalize" x-text="calendarMonthLabel()"></h3>
+                  <div class="flex items-center gap-2 text-slate-500">
+                    <button @click="prevMonth()" class="rounded-full bg-slate-100 p-2 hover:bg-slate-200">←</button>
+                    <button @click="nextMonth()" class="rounded-full bg-slate-100 p-2 hover:bg-slate-200">→</button>
+                  </div>
+                </div>
+                <div class="grid grid-cols-7 gap-3 text-center text-sm text-slate-500 mb-4">
+                  <div>Lun</div><div>Mar</div><div>Mer</div><div>Gio</div><div>Ven</div><div>Sab</div><div>Dom</div>
+                </div>
+                <div class="grid grid-cols-7 gap-3">
+                  <template x-for="(cell, idx) in calendarDays()" :key="idx">
+                    <div
+                      class="h-20 rounded-3xl border flex flex-col items-center justify-center text-sm shadow-sm"
+                      :class="cell ? 'bg-[#fbf9f3] border-slate-200 text-slate-600' : 'border-transparent'"
+                    >
+                      <span x-show="cell" x-text="cell ? cell.day : ''"></span>
+                      <span x-show="cell && cell.hasLesson" class="mt-1 h-1.5 w-1.5 rounded-full bg-slate-900"></span>
+                    </div>
+                  </template>
+                </div>
+              </article>
+
+              <article class="rounded-[40px] bg-white p-8 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-6">
+                  <div>
+                    <p class="text-sm uppercase tracking-[0.35em] text-slate-500">Agenda settimanale</p>
+                    <h3 class="mt-3 text-2xl font-semibold text-slate-900" x-text="weekRangeLabel()"></h3>
+                  </div>
+                  <div class="flex items-center gap-2 text-slate-500">
+                    <button @click="prevWeek()" class="rounded-full bg-slate-100 p-2 hover:bg-slate-200">←</button>
+                    <button @click="nextWeek()" class="rounded-full bg-slate-100 p-2 hover:bg-slate-200">→</button>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <template x-for="lesson in currentWeekLessons()" :key="lesson.id">
+                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 px-5 py-3">
+                      <div>
+                        <p class="font-semibold text-slate-800" x-text="courseName(lesson.course_id)"></p>
+                        <p class="text-sm text-slate-500" x-text="lesson.date + ' · ' + (lesson.start_time || '') + '-' + (lesson.end_time || '')"></p>
+                      </div>
+                      <span
+                        class="text-xs font-semibold px-3 py-1 rounded-full"
+                        :class="lesson.status === 'svolta' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                        x-text="lesson.status"
+                      ></span>
+                    </div>
+                  </template>
+                  <p x-show="currentWeekLessons().length === 0" class="text-sm text-slate-400">Nessuna lezione questa settimana.</p>
+                </div>
+              </article>
+            </section>
+          </template>
+
+          <!-- Aggiungi corso -->
+          <template x-if="view === 'addCourse'">
+            <section class="rounded-[40px] bg-white p-8 shadow-sm border border-slate-200 max-w-2xl" data-view="addCourse">
+              <h2 class="text-3xl font-semibold mb-6">Aggiungi corso</h2>
+              <form @submit.prevent="submitAddCourse()" class="space-y-5">
+                <div>
+                  <label class="text-sm font-semibold text-slate-600">Nome corso</label>
+                  <input required x-model="courseForm.name" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                </div>
+                <div>
+                  <label class="text-sm font-semibold text-slate-600">Docente</label>
+                  <input x-model="courseForm.teacher" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                </div>
+                <div>
+                  <label class="text-sm font-semibold text-slate-600">Ore totali</label>
+                  <input type="number" min="0" x-model="courseForm.total_hours" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-sm font-semibold text-slate-600">Data inizio</label>
+                    <input required type="date" x-model="courseForm.start_date" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                  </div>
+                  <div>
+                    <label class="text-sm font-semibold text-slate-600">Data fine</label>
+                    <input required type="date" x-model="courseForm.end_date" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-semibold text-slate-600">Orario settimanale ricorrente</label>
+                    <button type="button" @click="addSlot(courseForm)" class="text-xs font-semibold text-slate-700 underline">+ Aggiungi slot</button>
+                  </div>
+                  <div class="space-y-2">
+                    <template x-for="(slot, idx) in courseForm.slots" :key="idx">
+                      <div class="flex items-center gap-2">
+                        <select x-model.number="slot.weekday" class="rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                          <template x-for="wd in weekdays" :key="wd.value">
+                            <option :value="wd.value" x-text="wd.label"></option>
+                          </template>
+                        </select>
+                        <input type="time" x-model="slot.start_time" class="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                        <input type="time" x-model="slot.end_time" class="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                        <button type="button" @click="removeSlot(courseForm, idx)" class="text-slate-400 hover:text-red-600 text-sm">✕</button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <p x-show="overlapWarning" class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                  Attenzione: uno slot si sovrappone con un corso già esistente. Puoi comunque salvare.
+                </p>
+
+                <div class="flex gap-3 pt-2">
+                  <button type="submit" class="rounded-full bg-slate-900 text-white px-6 py-3 text-sm font-semibold">Salva corso</button>
+                  <button type="button" @click="goDashboard()" class="rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold">Annulla</button>
+                </div>
+              </form>
+            </section>
+          </template>
+
+          <!-- Dettagli corso -->
+          <template x-if="view === 'courseDetails' && selectedCourse">
+            <section class="rounded-[40px] bg-white p-8 shadow-sm border border-slate-200 max-w-2xl" data-view="courseDetails">
+              <div class="flex items-center justify-between mb-6">
+                <h2 class="text-3xl font-semibold" x-text="selectedCourse.name"></h2>
+                <button x-show="!courseEditing" @click="startEditCourse()" class="text-sm font-semibold underline">Modifica</button>
+              </div>
+
+              <template x-if="!courseEditing">
+                <div class="space-y-3 text-slate-700">
+                  <p><span class="font-semibold">Docente:</span> <span x-text="selectedCourse.teacher || '—'"></span></p>
+                  <p><span class="font-semibold">Ore totali:</span> <span x-text="selectedCourse.total_hours || '—'"></span></p>
+                  <p><span class="font-semibold">Periodo:</span> <span x-text="selectedCourse.start_date + ' → ' + selectedCourse.end_date"></span></p>
+                  <div>
+                    <p class="font-semibold mb-1">Orario ricorrente:</p>
+                    <ul class="list-disc list-inside text-sm text-slate-600">
+                      <template x-for="slot in selectedCourse.slots" :key="slot.id">
+                        <li>
+                          <span x-text="weekdays.find(w => w.value === slot.weekday)?.label"></span>
+                          <span x-text="' ' + slot.start_time + '-' + slot.end_time"></span>
+                        </li>
+                      </template>
+                    </ul>
+                  </div>
+                </div>
+              </template>
+
+              <template x-if="courseEditing">
+                <form @submit.prevent="saveEditCourse()" class="space-y-5">
+                  <div>
+                    <label class="text-sm font-semibold text-slate-600">Nome corso</label>
+                    <input required x-model="courseEditForm.name" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                  </div>
+                  <div>
+                    <label class="text-sm font-semibold text-slate-600">Docente</label>
+                    <input x-model="courseEditForm.teacher" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                  </div>
+                  <div>
+                    <label class="text-sm font-semibold text-slate-600">Ore totali</label>
+                    <input type="number" min="0" x-model="courseEditForm.total_hours" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="text-sm font-semibold text-slate-600">Data inizio</label>
+                      <input required type="date" x-model="courseEditForm.start_date" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                    </div>
+                    <div>
+                      <label class="text-sm font-semibold text-slate-600">Data fine</label>
+                      <input required type="date" x-model="courseEditForm.end_date" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="text-sm font-semibold text-slate-600">Orario settimanale ricorrente</label>
+                      <button type="button" @click="addSlot(courseEditForm)" class="text-xs font-semibold text-slate-700 underline">+ Aggiungi slot</button>
+                    </div>
+                    <div class="space-y-2">
+                      <template x-for="(slot, idx) in courseEditForm.slots" :key="idx">
+                        <div class="flex items-center gap-2">
+                          <select x-model.number="slot.weekday" class="rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                            <template x-for="wd in weekdays" :key="wd.value">
+                              <option :value="wd.value" x-text="wd.label"></option>
+                            </template>
+                          </select>
+                          <input type="time" x-model="slot.start_time" class="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                          <input type="time" x-model="slot.end_time" class="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                          <button type="button" @click="removeSlot(courseEditForm, idx)" class="text-slate-400 hover:text-red-600 text-sm">✕</button>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="flex gap-3 pt-2">
+                    <button type="submit" class="rounded-full bg-slate-900 text-white px-6 py-3 text-sm font-semibold">Salva</button>
+                    <button type="button" @click="cancelEditCourse()" class="rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold">Annulla</button>
+                  </div>
+                </form>
+              </template>
+
+              <div class="mt-8 pt-6 border-t border-slate-200" x-show="!courseEditing">
+                <button
+                  x-show="deleteStage === null"
+                  @click="requestDeleteCourse()"
+                  class="text-sm font-semibold text-red-600 underline"
+                >Elimina corso</button>
+
+                <div x-show="deleteStage === 'confirm'" class="space-y-3" x-cloak>
+                  <p class="text-sm text-slate-600">Confermi l'eliminazione definitiva del corso e delle sue lezioni?</p>
+                  <div class="flex gap-3">
+                    <button @click="confirmDeleteCourse()" class="rounded-full bg-red-600 text-white px-5 py-2 text-sm font-semibold">Elimina definitivamente</button>
+                    <button @click="cancelDelete()" class="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold">Annulla</button>
+                  </div>
+                </div>
+
+                <div x-show="deleteStage === 'choose'" class="space-y-3" x-cloak>
+                  <p class="text-sm text-slate-600">Questo corso ha lezioni svolte. Vuoi eliminarlo definitivamente o archiviarlo?</p>
+                  <div class="flex gap-3">
+                    <button @click="confirmDeleteCourse()" class="rounded-full bg-red-600 text-white px-5 py-2 text-sm font-semibold">Elimina definitivamente</button>
+                    <button @click="archiveCourseAction()" class="rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-semibold">Archivia</button>
+                    <button @click="cancelDelete()" class="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold">Annulla</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <!-- Lezioni corso -->
+          <template x-if="view === 'courseLessons' && selectedCourse">
+            <section class="rounded-[40px] bg-white p-8 shadow-sm border border-slate-200" data-view="courseLessons">
+              <div class="mb-6">
+                <p class="text-sm uppercase tracking-[0.35em] text-slate-500">Lezioni</p>
+                <h2 class="mt-3 text-2xl font-semibold text-slate-900" x-text="selectedCourse.name"></h2>
+              </div>
+
+              <div class="space-y-6">
+                <template x-for="group in weeksGrouped()" :key="group.week">
+                  <div>
+                    <h4 class="mb-4 text-sm font-semibold text-slate-600 uppercase tracking-[0.2em] border-b border-slate-200 pb-2">
+                      Settimana <span x-text="group.week"></span>
+                    </h4>
+                    <div class="flex flex-wrap gap-3">
+                      <template x-for="(lesson, idx) in group.lessons" :key="lesson.id">
+                        <button
+                          @click="openLessonModal(lesson)"
+                          class="h-24 w-24 rounded-3xl border flex items-center justify-center text-sm font-semibold shadow-sm transition"
+                          :class="lessonStatusClass(lesson)"
+                        >
+                          <span x-text="idx + 1"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+                <p x-show="lessons.length === 0" class="text-sm text-slate-400">Nessuna lezione generata per questo corso.</p>
+              </div>
+            </section>
+          </template>
+
+          <!-- Calendario corso -->
+          <template x-if="view === 'courseCalendar' && selectedCourse">
+            <section class="rounded-[40px] bg-white p-8 shadow-sm border border-slate-200" data-view="courseCalendar">
+              <div class="flex items-center justify-between mb-6">
+                <div>
+                  <p class="text-sm uppercase tracking-[0.35em] text-slate-500" x-text="selectedCourse.name"></p>
+                  <h3 class="mt-3 text-2xl font-semibold text-slate-900 capitalize" x-text="calendarMonthLabel()"></h3>
+                </div>
+                <div class="flex items-center gap-2 text-slate-500">
+                  <button @click="prevMonth()" class="rounded-full bg-slate-100 p-2 hover:bg-slate-200">←</button>
+                  <button @click="nextMonth()" class="rounded-full bg-slate-100 p-2 hover:bg-slate-200">→</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-7 gap-3 text-center text-sm text-slate-500 mb-4">
+                <div>Lun</div><div>Mar</div><div>Mer</div><div>Gio</div><div>Ven</div><div>Sab</div><div>Dom</div>
+              </div>
+              <div class="grid grid-cols-7 gap-3">
+                <template x-for="(cell, idx) in calendarDays()" :key="idx">
+                  <div
+                    class="h-20 rounded-3xl border flex flex-col items-center justify-center text-sm shadow-sm"
+                    :class="cell ? 'bg-[#fbf9f3] border-slate-200 text-slate-600' : 'border-transparent'"
+                  >
+                    <span x-show="cell" x-text="cell ? cell.day : ''"></span>
+                    <span x-show="cell && cell.hasLesson" class="mt-1 h-1.5 w-1.5 rounded-full bg-slate-900"></span>
+                  </div>
+                </template>
+              </div>
+            </section>
+          </template>
+
+          <!-- Archivio -->
+          <template x-if="view === 'archive'">
+            <section class="space-y-4" data-view="archive">
+              <h2 class="text-3xl font-semibold">Archivio</h2>
+              <p class="text-slate-500">Corsi archiviati e consultazione cronologica.</p>
+              <div class="space-y-3">
+                <template x-for="course in archivedCourses" :key="course.id">
+                  <div class="rounded-2xl bg-white border border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+                    <div>
+                      <p class="font-semibold" x-text="course.name"></p>
+                      <p class="text-sm text-slate-500" x-text="course.start_date + ' → ' + course.end_date"></p>
+                    </div>
+                    <div class="flex gap-2">
+                      <button @click="selectCourse(course, 'courseDetails')" class="text-sm font-semibold underline">Apri</button>
+                      <button @click="restoreCourseAction(course)" class="text-sm font-semibold text-emerald-700 underline">Ripristina</button>
+                      <button @click="deleteArchivedCourse(course)" class="text-sm font-semibold text-red-600 underline">Elimina definitivamente</button>
+                    </div>
+                  </div>
+                </template>
+                <p x-show="archivedCourses.length === 0" class="text-sm text-slate-400">Nessun corso archiviato.</p>
+              </div>
+            </section>
+          </template>
+
+          <!-- Impostazioni -->
+          <template x-if="view === 'settings'">
+            <section class="space-y-6" data-view="settings">
+              <h2 class="text-3xl font-semibold">Impostazioni</h2>
+
+              <div class="flex gap-2 border-b border-slate-200">
+                <button
+                  @click="settingsTab = 'personalizzazione'"
+                  :class="settingsTab === 'personalizzazione' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'"
+                  class="px-4 py-3 text-sm font-semibold border-b-2"
+                >Personalizzazione</button>
+                <button
+                  @click="settingsTab = 'backup'"
+                  :class="settingsTab === 'backup' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'"
+                  class="px-4 py-3 text-sm font-semibold border-b-2"
+                >Backup e dati</button>
+                <button
+                  @click="settingsTab = 'trascrizione'"
+                  :class="settingsTab === 'trascrizione' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400'"
+                  class="px-4 py-3 text-sm font-semibold border-b-2"
+                >Trascrizione e AI</button>
+              </div>
+
+              <div x-show="settingsTab === 'personalizzazione'" class="max-w-xl space-y-6" x-cloak>
+                <div>
+                  <label for="footer-text-input" class="text-sm font-semibold text-slate-600">Frase del footer</label>
+                  <input id="footer-text-input" x-model="footerDraft" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
+                  <button @click="saveFooter()" class="mt-2 rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-semibold">Salva</button>
+                </div>
+                <div>
+                  <label for="header-image-input" class="text-sm font-semibold text-slate-600">Immagine di sfondo header</label>
+                  <input id="header-image-input" type="file" accept="image/*" @change="onHeaderImageChange($event)" class="mt-1 block text-sm" />
+                </div>
+              </div>
+
+              <div x-show="settingsTab === 'backup'" class="max-w-xl space-y-4" x-cloak>
+                <p class="text-sm text-slate-600">Esporta o importa una copia del database locale.</p>
+                <div class="flex gap-3">
+                  <button @click="exportBackup()" class="rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-semibold">Esporta database</button>
+                  <button @click="importBackup()" class="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold">Importa database</button>
+                </div>
+                <p x-show="backupMessage" class="text-sm text-emerald-700" x-text="backupMessage"></p>
+              </div>
+
+              <div x-show="settingsTab === 'trascrizione'" class="max-w-xl" x-cloak>
+                <p class="text-sm text-slate-400 italic">Non ancora disponibile — funzionalità pianificata separatamente.</p>
+              </div>
+            </section>
+          </template>
+
+        </main>
+      </div>
+
+      <footer class="bg-slate-900 text-white px-8 py-5">
+        <p class="text-sm font-semibold" x-text="settings.footer_text || 'Sylla — tracciamento lezioni'"></p>
+      </footer>
+    </div>
+
+    <!-- Modale compilazione lezione -->
+    <div x-show="showLessonModal" x-cloak class="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-6 z-50">
+      <div class="bg-white rounded-[32px] shadow-xl max-w-xl w-full max-h-[85vh] overflow-y-auto p-8" @click.outside="closeLessonModal()">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <p class="text-sm uppercase tracking-[0.3em] text-slate-500" x-text="editingLesson.date"></p>
+            <p class="text-sm text-slate-500" x-text="(editingLesson.start_time || '') + '-' + (editingLesson.end_time || '')"></p>
+          </div>
+          <label class="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" :checked="editingLesson.status === 'svolta'" @change="editingLesson.status = $event.target.checked ? 'svolta' : 'programmata'" />
+            Segna come svolta
+          </label>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="space-y-4">
           <div>
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">I miei corsi</h2>
-              <button
-                @click="view = 'addCourse'; menu = 'dashboard'"
-                class="text-xs font-semibold text-white bg-slate-900 px-3 py-1 rounded"
-              >
-                + Aggiungi
-              </button>
-            </div>
+            <label for="lesson-topic-input" class="text-sm font-semibold text-slate-600">Argomento / contenuti trattati</label>
+            <textarea id="lesson-topic-input" x-model="editingLesson.topic" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2"></textarea>
+          </div>
 
-            <template x-for="course in courses" :key="course.id">
-              <button
-                @click="selectedCourse = course; view = 'courseDetails'; menu = 'dashboard'"
-                :class="selectedCourse && selectedCourse.id === course.id ? 'bg-slate-100' : ''"
-                class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100"
-              >
-                <div class="font-medium" x-text="course.name"></div>
-              </button>
-            </template>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-sm font-semibold text-slate-600">Materiali e link</label>
+              <button type="button" @click="addMaterial()" class="text-xs font-semibold text-slate-700 underline">+ Aggiungi materiale</button>
+            </div>
+            <div class="space-y-2">
+              <template x-for="(m, idx) in editingLesson.materials" :key="idx">
+                <div class="flex items-center gap-2">
+                  <input x-model="m.label" placeholder="Nome" class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                  <input x-model="m.url" placeholder="Link" class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                  <button type="button" @click="removeMaterial(idx)" class="text-slate-400 hover:text-red-600 text-sm">✕</button>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div>
+            <label for="lesson-notes-input" class="text-sm font-semibold text-slate-600">Note libere</label>
+            <textarea id="lesson-notes-input" x-model="editingLesson.notes" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2"></textarea>
+          </div>
+
+          <div>
+            <label for="lesson-recording-link-input" class="text-sm font-semibold text-slate-600">Link alla registrazione</label>
+            <input id="lesson-recording-link-input" x-model="editingLesson.recording_link" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2" />
           </div>
         </div>
 
-        <div class="p-4 border-t border-slate-200 space-y-2">
-          <button
-            @click="view = 'dashboard'; menu = 'dashboard'"
-            :class="menu === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'"
-            class="w-full px-4 py-3 rounded-lg"
-          >
-            Dashboard
-          </button>
-          <button
-            @click="view = 'archive'; menu = 'archive'"
-            :class="menu === 'archive' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'"
-            class="w-full px-4 py-3 rounded-lg"
-          >
-            Archivio
-          </button>
-          <button
-            @click="view = 'settings'; menu = 'settings'"
-            :class="menu === 'settings' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'"
-            class="w-full px-4 py-3 rounded-lg"
-          >
-            Impostazioni
-          </button>
+        <div class="flex gap-3 pt-6">
+          <button @click="saveLesson()" class="rounded-full bg-slate-900 text-white px-6 py-3 text-sm font-semibold">Salva</button>
+          <button @click="closeLessonModal()" class="rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold">Annulla</button>
         </div>
-      </aside>
-
-      <main class="flex-1 p-8">
-        <template x-if="view === 'dashboard'">
-          <section>
-            <div class="mb-6">
-              <h2 class="text-3xl font-semibold">Dashboard</h2>
-              <p class="text-slate-500 mt-2">Panoramica generale delle lezioni e del calendario.</p>
-            </div>
-            <div class="grid gap-4 md:grid-cols-2">
-              <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">Calendario mensile placeholder</div>
-              <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">Agenda settimanale placeholder</div>
-            </div>
-          </section>
-        </template>
-
-        <template x-if="view === 'courseDetails'">
-          <section>
-            <h2 class="text-3xl font-semibold">Dettagli corso</h2>
-            <p class="text-slate-500 mt-2" x-text="selectedCourse ? selectedCourse.name : 'Nessun corso selezionato'"></p>
-          </section>
-        </template>
-
-        <template x-if="view === 'archive'">
-          <section>
-            <h2 class="text-3xl font-semibold">Archivio</h2>
-            <p class="text-slate-500 mt-2">Corsi archiviati e consultazione cronologica.</p>
-          </section>
-        </template>
-
-        <template x-if="view === 'settings'">
-          <section>
-            <h2 class="text-3xl font-semibold">Impostazioni</h2>
-            <p class="text-slate-500 mt-2">Preferenze trascrizione, AI e personalizzazione.</p>
-          </section>
-        </template>
-
-        <template x-if="view === 'addCourse'">
-          <section>
-            <h2 class="text-3xl font-semibold">Aggiungi corso</h2>
-            <p class="text-slate-500 mt-2">Form per creare un nuovo corso.</p>
-          </section>
-        </template>
-      </main>
+      </div>
     </div>
   </body>
 </html>
