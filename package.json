@@ -6,9 +6,17 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
   },
   "devDependencies": {
-    "electron": "^26.0.0"
+    "@electron/rebuild": "^3.6.0",
+    "@playwright/test": "^1.47.0",
+    "electron": "^33.4.11",
+    "playwright": "^1.47.0"
   }
 }
