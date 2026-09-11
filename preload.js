@@ -28,4 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     export: () => ipcRenderer.invoke('backup:export'),
     import: () => ipcRenderer.invoke('backup:import'),
   },
+  studyStats: {
+    export: () => ipcRenderer.invoke('data:exportStudyStats'),
+  },
 });

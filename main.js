@@ -60,6 +60,17 @@ function registerIpcHandlers() {
     if (canceled || !filePaths.length) return { canceled: true };
     return { canceled: false, ...db.importBackup(filePaths[0]) };
   });
+
+  ipcMain.handle('data:exportStudyStats', async () => {
+    const win = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Esporta dati per Sylla study-stats',
+      defaultPath: 'study-stats.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (canceled || !filePath) return { canceled: true };
+    return { canceled: false, ...db.exportStudyStats(filePath) };
+  });
 }
 
 app.whenReady().then(() => {

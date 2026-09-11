@@ -278,6 +278,41 @@ function importBackup(srcPath) {
   return { imported: true };
 }
 
+// ---- study-stats export ----
+
+function slotMinutes(startTime, endTime) {
+  if (!startTime || !endTime) return 0;
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
+}
+
+function exportStudyStats(destPath) {
+  const courses = getDb().prepare('SELECT * FROM courses ORDER BY id').all();
+  const data = {
+    generated_at: new Date().toISOString(),
+    courses: courses.map((course) => {
+      const lessons = getDb()
+        .prepare(
+          `SELECT date, start_time, end_time, status FROM lessons
+           WHERE course_id = ? AND status = 'svolta' ORDER BY date, start_time`
+        )
+        .all(course.id)
+        .map((l) => ({ ...l, studied_minutes: slotMinutes(l.start_time, l.end_time) }));
+      return {
+        id: course.id,
+        name: course.name,
+        teacher: course.teacher,
+        total_hours: course.total_hours,
+        status: course.status,
+        lessons,
+      };
+    }),
+  };
+  fs.writeFileSync(destPath, JSON.stringify(data, null, 2));
+  return { path: destPath };
+}
+
 module.exports = {
   init,
   closeDb,
@@ -298,4 +333,5 @@ module.exports = {
   setSetting,
   exportBackup,
   importBackup,
+  exportStudyStats,
 };

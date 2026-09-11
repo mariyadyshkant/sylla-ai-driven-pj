@@ -444,6 +444,12 @@
                   <button @click="exportBackup()" class="rounded-full bg-slate-900 text-white px-5 py-2 text-sm font-semibold">Esporta database</button>
                   <button @click="importBackup()" class="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold">Importa database</button>
                 </div>
+
+                <div class="pt-4 border-t border-slate-200">
+                  <p class="text-sm text-slate-600">Esporta i dati di corsi e lezioni svolte in un file JSON, da usare come sorgente per il microservizio esterno Sylla study-stats.</p>
+                  <button @click="exportStudyStats()" class="mt-3 rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold">Esporta dati per study-stats</button>
+                </div>
+
                 <p x-show="backupMessage" class="text-sm text-emerald-700" x-text="backupMessage"></p>
               </div>
 

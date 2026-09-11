@@ -402,6 +402,11 @@ function appFactory() {
         await this.refreshAllLessons();
       }
     },
+
+    async exportStudyStats() {
+      const result = await window.api.studyStats.export();
+      this.backupMessage = result.canceled ? '' : `Dati study-stats esportati in ${result.path}`;
+    },
   };
 }
 
