@@ -2,7 +2,28 @@
 
 ## Obiettivo
 
-Esporre in modo stabile e strutturato i dati di corsi/lezioni necessari a un microservizio esterno containerizzato ("Sylla study-stats", pattern week-6: ingest → SQLite+FTS5 → API REST → dashboard) che calcoli statistiche "quanto ho studiato", senza violare i vincoli ADR (nessuna rete diretta verso il processo Electron, nessuna dipendenza cloud, app che resta leggera).
+Esporre in modo stabile e strutturato i dati di corsi/lezioni necessari a un microservizio esterno containerizzato ("Sylla study-stats", pattern week-6: ingest → SQLite+FTS5 → API REST → dashboard) che calcoli statistiche "quanto ho studiato", senza violare i vincoli ADR (nessuna dipendenza cloud, app che resta leggera, nessuna esposizione oltre la macchina locale).
+
+## Aggiornamento — meccanismo automatico (v2)
+
+Il meccanismo primario non è più l'export manuale su file, ma un endpoint HTTP
+locale sempre live:
+
+- `main.js` avvia un piccolo server Node (`http`, nessuna dipendenza aggiunta)
+  in ascolto **solo su `127.0.0.1:4174`** (porta configurabile via
+  `SYLLA_STUDY_STATS_PORT`, usata dai test per isolamento).
+- `GET /api/v1/study-stats` ricalcola il payload live da SQLite ad ogni
+  richiesta (`db.buildStudyStats()`), quindi riflette sempre lo stato corrente
+  senza bisogno di alcun trigger su modifica o su chiusura dell'app.
+- Il microservizio esterno interroga questo endpoint a intervalli regolari
+  (scheduler interno lato microservizio, non lato Sylla) — nessuna azione
+  manuale richiesta da nessuna delle due parti.
+- Resta disponibile, invariato, l'export manuale su file JSON (Impostazioni →
+  Backup e dati) come fallback per uso offline/debug.
+- Sicurezza: il bind è solo su loopback, quindi non raggiungibile da altre
+  macchine della rete; il microservizio containerizzato lo raggiunge tramite
+  `host.docker.internal` (Docker Desktop instrada verso porte loopback
+  dell'host).
 
 ## Contesto
 
@@ -57,4 +78,10 @@ Oggi l'unico accesso ai dati (`courses`, `course_slots`, `lessons`, `lesson_mate
 
 ## Status
 
-[x] Implementata (lato Electron): comando `data:exportStudyStats` (IPC + voce "Esporta dati per study-stats" in Impostazioni → Backup e dati), `db.exportStudyStats` in `db.js`, test in `tests/study-stats-export.spec.js`. Resta da creare il repo/container del microservizio esterno che ingerisce il file JSON prodotto.
+[x] Implementata (lato Electron):
+- `db.buildStudyStats()` / `db.exportStudyStats()` in `db.js`
+- Endpoint locale `GET /api/v1/study-stats` (`main.js`, bind `127.0.0.1:4174`), sempre live
+- Export manuale su file invariato (IPC `data:exportStudyStats`, voce in Impostazioni → Backup e dati)
+- Test: `tests/study-stats-export.spec.js` (file), `tests/study-stats-api.spec.js` (endpoint live)
+
+[x] Implementato il microservizio esterno `sylla-study-stats` (https://github.com/mariyadyshkant/sylla-study-stats): ingest automatico via scheduler interno che interroga l'endpoint sopra, containerizzato con Docker.

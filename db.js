@@ -287,9 +287,9 @@ function slotMinutes(startTime, endTime) {
   return eh * 60 + em - (sh * 60 + sm);
 }
 
-function exportStudyStats(destPath) {
+function buildStudyStats() {
   const courses = getDb().prepare('SELECT * FROM courses ORDER BY id').all();
-  const data = {
+  return {
     generated_at: new Date().toISOString(),
     courses: courses.map((course) => {
       const lessons = getDb()
@@ -309,7 +309,10 @@ function exportStudyStats(destPath) {
       };
     }),
   };
-  fs.writeFileSync(destPath, JSON.stringify(data, null, 2));
+}
+
+function exportStudyStats(destPath) {
+  fs.writeFileSync(destPath, JSON.stringify(buildStudyStats(), null, 2));
   return { path: destPath };
 }
 
@@ -333,5 +336,6 @@ module.exports = {
   setSetting,
   exportBackup,
   importBackup,
+  buildStudyStats,
   exportStudyStats,
 };

@@ -1,6 +1,38 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const http = require('http');
 const db = require('./db');
+
+// Server locale in sola lettura (bind 127.0.0.1) usato dal microservizio esterno
+// "Sylla study-stats" per leggere i dati sempre aggiornati senza export manuale.
+// Non raggiungibile dalla rete esterna alla macchina: coerente col vincolo ADR
+// "nessuna autenticazione / nessuna esposizione multi-utente" perché resta locale.
+let studyStatsServer;
+
+function startStudyStatsServer() {
+  const port = Number(process.env.SYLLA_STUDY_STATS_PORT) || 4174;
+  studyStatsServer = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/api/v1/study-stats') {
+      const payload = db.buildStudyStats();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'not found' }));
+  });
+  studyStatsServer.on('error', (err) => {
+    console.error('study-stats server error:', err.message);
+  });
+  studyStatsServer.listen(port, '127.0.0.1');
+}
+
+function stopStudyStatsServer() {
+  if (studyStatsServer) {
+    studyStatsServer.close();
+    studyStatsServer = undefined;
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -76,6 +108,7 @@ function registerIpcHandlers() {
 app.whenReady().then(() => {
   db.init();
   registerIpcHandlers();
+  startStudyStatsServer();
   createWindow();
 });
 
@@ -89,4 +122,8 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+app.on('before-quit', () => {
+  stopStudyStatsServer();
 });

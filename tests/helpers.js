@@ -5,7 +5,7 @@ const fs = require('fs');
 
 async function launchApp() {
   const dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sylla-test-')), 'sylla.db');
-  const env = { ...process.env, SYLLA_DB_PATH: dbPath, NODE_ENV: 'test' };
+  const env = { ...process.env, SYLLA_DB_PATH: dbPath, NODE_ENV: 'test', SYLLA_STUDY_STATS_PORT: '4175' };
   // Some host shells (e.g. terminals embedded in an Electron app) export this,
   // which forces any Electron binary to run as plain Node and reject its own CLI flags.
   delete env.ELECTRON_RUN_AS_NODE;
