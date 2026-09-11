@@ -23,4 +23,7 @@ Implementare le impostazioni dell'app, inclusi modello whisper, lingua di trascr
 
 ## Status
 
-[ ] Non iniziata
+[x] Completata (parziale)
+
+Completata il: 2026-09-11
+Note: implementate le tab Personalizzazione (frase footer, immagine header) e Backup e dati (esporta/importa database via dialog nativi). La tab Trascrizione e AI è presente come placeholder disabilitato — quella configurazione appartiene a feature-trascrizione-e-ai.md, esplicitamente esclusa da questo giro di lavoro.

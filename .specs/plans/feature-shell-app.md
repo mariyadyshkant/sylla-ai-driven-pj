@@ -25,4 +25,7 @@ Gestire la struttura principale dell'app desktop, inclusa la sidebar, la dashboa
 
 ## Status
 
-[ ] Non iniziata
+[x] Completata
+
+Completata il: 2026-09-11
+Note: sidebar con sottomenu Dettagli/Lezioni/Calendario per corso, header/footer personalizzabili da Impostazioni, router centrale unico su `view` (nessun contenuto renderizzato fuori da un `x-if`). Copre anche la vista Archivio richiesta dal brief.

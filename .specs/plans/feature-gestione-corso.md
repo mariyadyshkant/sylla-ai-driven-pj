@@ -25,4 +25,7 @@ Implementare la creazione, modifica, cancellazione, archiviazione e visualizzazi
 
 ## Status
 
-[ ] Non iniziata
+[x] Completata
+
+Completata il: 2026-09-11
+Note: CRUD completo su `db.js` (courses + course_slots) via IPC. Eliminazione con conferma; se il corso ha lezioni svolte offre la scelta Elimina/Archivia (altrimenti solo eliminazione), come da SYLLA-BRIEF.md §6.3. Archiviazione/ripristino gestiti dalla vista Archivio.
