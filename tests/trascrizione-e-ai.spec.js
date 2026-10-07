@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { launchApp, closeApp } = require('./helpers');
+const { launchApp, closeApp, openLessonWindow, saveAndCloseLesson } = require('./helpers');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -28,7 +28,7 @@ function makeFakeBinaries(dir) {
   return { ffmpeg, whisper };
 }
 
-async function createCourseAndOpenFirstLesson(window) {
+async function createCourseAndOpenFirstLesson(app, window) {
   const start = new Date('2027-05-03T00:00:00');
   const end = new Date(start);
   end.setDate(start.getDate() + 7);
@@ -39,7 +39,7 @@ async function createCourseAndOpenFirstLesson(window) {
   await window.locator('[data-view="addCourse"] select').first().selectOption(String(start.getDay()));
   await window.getByRole('button', { name: 'Salva corso' }).click();
   await window.getByRole('button', { name: 'Lezioni', exact: true }).click();
-  await window.locator('[data-view="courseLessons"] button').first().click();
+  return openLessonWindow(app, window.locator('[data-view="courseLessons"] button').first());
 }
 
 test.describe('Trascrizione e AI', () => {
@@ -86,18 +86,17 @@ test.describe('Trascrizione e AI', () => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
     }, audio);
 
-    await createCourseAndOpenFirstLesson(window);
-    const modal = window.locator('.fixed');
-    await modal.getByRole('button', { name: 'Carica file audio/video' }).click();
-    await expect(modal.getByLabel('Trascrizione')).toHaveValue('Trascrizione di prova della lezione');
+    const lessonWin = await createCourseAndOpenFirstLesson(app, window);
+    await lessonWin.getByRole('button', { name: 'Carica file audio/video' }).click();
+    await expect(lessonWin.getByLabel('Trascrizione')).toHaveValue('Trascrizione di prova della lezione');
 
-    await modal.getByRole('button', { name: 'Salva' }).click();
-    await window.locator('[data-view="courseLessons"] button').first().click();
-    await expect(modal.getByLabel('Trascrizione')).toHaveValue('Trascrizione di prova della lezione');
+    await saveAndCloseLesson(lessonWin);
+    const reopened = await openLessonWindow(app, window.locator('[data-view="courseLessons"] button').first());
+    await expect(reopened.getByLabel('Trascrizione')).toHaveValue('Trascrizione di prova della lezione');
   });
 
   test('"Elabora in note" è disabilitato senza trascrizione e usa la API key salvata', async () => {
-    const { window } = ctx;
+    const { app, window } = ctx;
     await window.getByRole('button', { name: 'Impostazioni' }).click();
     await window.getByRole('button', { name: 'Trascrizione e AI' }).click();
     await window.getByLabel('API key per l\'elaborazione AI').fill('sk-test-123');
@@ -105,8 +104,7 @@ test.describe('Trascrizione e AI', () => {
     await expect(window.getByText('Impostazioni salvate.')).toBeVisible();
 
     await window.getByRole('button', { name: '+ Aggiungi corso' }).click();
-    await createCourseAndOpenFirstLesson(window);
-    const modal = window.locator('.fixed');
+    const modal = await createCourseAndOpenFirstLesson(app, window);
     const button = modal.getByRole('button', { name: 'Elabora in note' });
     await expect(button).toBeDisabled();
 

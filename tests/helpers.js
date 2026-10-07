@@ -23,4 +23,21 @@ async function closeApp({ app, dbPath }) {
   fs.rmSync(path.dirname(dbPath), { recursive: true, force: true });
 }
 
-module.exports = { launchApp, closeApp };
+// La lezione si apre in una finestra separata: clicca il riquadro e restituisce la nuova pagina.
+async function openLessonWindow(app, trigger) {
+  const [page] = await Promise.all([app.waitForEvent('window'), trigger.click()]);
+  await page.waitForSelector('#lesson-topic-input');
+  return page;
+}
+
+async function saveLesson(page) {
+  await page.getByRole('button', { name: 'Salva' }).click();
+  await page.getByText('Salvato').waitFor();
+}
+
+async function saveAndCloseLesson(page) {
+  await saveLesson(page);
+  await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Chiudi' }).click()]);
+}
+
+module.exports = { launchApp, closeApp, openLessonWindow, saveLesson, saveAndCloseLesson };

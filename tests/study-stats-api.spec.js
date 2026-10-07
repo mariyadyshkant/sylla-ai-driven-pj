@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const http = require('http');
-const { launchApp, closeApp } = require('./helpers');
+const { launchApp, closeApp, openLessonWindow, saveAndCloseLesson } = require('./helpers');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -33,7 +33,7 @@ test.describe('API locale study-stats', () => {
   });
 
   test('espone su localhost i corsi e le lezioni svolte, sempre aggiornati, senza export manuale', async () => {
-    const { window } = ctx;
+    const { app, window } = ctx;
     const start = new Date('2027-07-05T00:00:00'); // lunedì
     const end = new Date(start);
     end.setDate(start.getDate() + 7);
@@ -53,11 +53,9 @@ test.describe('API locale study-stats', () => {
 
     await window.getByRole('button', { name: 'Lezioni', exact: true }).click();
     const firstBox = window.locator('[data-view="courseLessons"] button').first();
-    await firstBox.click();
-    const modal = window.locator('.fixed');
-    await modal.locator('input[type="checkbox"]').check();
-    await modal.getByRole('button', { name: 'Salva' }).click();
-    await expect(modal).toBeHidden();
+    const lessonWin = await openLessonWindow(app, firstBox);
+    await lessonWin.locator('input[type="checkbox"]').check();
+    await saveAndCloseLesson(lessonWin);
 
     // Nessuna azione di export: l'endpoint riflette subito la modifica.
     res = await getJson('http://127.0.0.1:4175/api/v1/study-stats');

@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { launchApp, closeApp } = require('./helpers');
+const { launchApp, closeApp, openLessonWindow, saveAndCloseLesson } = require('./helpers');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -39,11 +39,9 @@ test.describe('Export dati study-stats', () => {
 
     await window.getByRole('button', { name: 'Lezioni', exact: true }).click();
     const firstBox = window.locator('[data-view="courseLessons"] button').first();
-    await firstBox.click();
-    const modal = window.locator('.fixed');
-    await modal.locator('input[type="checkbox"]').check();
-    await modal.getByRole('button', { name: 'Salva' }).click();
-    await expect(modal).toBeHidden();
+    const lessonWin = await openLessonWindow(app, firstBox);
+    await lessonWin.locator('input[type="checkbox"]').check();
+    await saveAndCloseLesson(lessonWin);
 
     await window.getByRole('button', { name: 'Impostazioni' }).click();
     await window.getByRole('button', { name: 'Backup e dati' }).click();

@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { launchApp, closeApp } = require('./helpers');
+const { launchApp, closeApp, openLessonWindow, saveAndCloseLesson } = require('./helpers');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -52,7 +52,7 @@ test.describe('Gestione corso', () => {
   });
 
   test('archivia un corso con lezioni svolte e lo ripristina', async () => {
-    const { window } = ctx;
+    const { app, window } = ctx;
     const start = new Date('2027-03-01T00:00:00');
     const end = new Date('2027-03-15T00:00:00');
 
@@ -60,9 +60,9 @@ test.describe('Gestione corso', () => {
 
     await window.getByRole('button', { name: 'Lezioni' }).click();
     await expect(window.locator('[data-view="courseLessons"]')).toBeVisible();
-    await window.locator('[data-view="courseLessons"] button', { hasText: '1' }).first().click();
-    await window.locator('.fixed input[type="checkbox"]').check();
-    await window.getByRole('button', { name: 'Salva' }).last().click();
+    const lessonWin = await openLessonWindow(app, window.locator('[data-view="courseLessons"] button', { hasText: '1' }).first());
+    await lessonWin.locator('input[type="checkbox"]').check();
+    await saveAndCloseLesson(lessonWin);
 
     await window.getByRole('button', { name: 'Dettagli' }).click();
     await window.getByRole('button', { name: 'Elimina corso' }).click();

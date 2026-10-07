@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { launchApp, closeApp } = require('./helpers');
+const { launchApp, closeApp, openLessonWindow, saveAndCloseLesson } = require('./helpers');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -82,10 +82,10 @@ test.describe('Generazione calendario lezioni', () => {
     await window.getByRole('button', { name: 'Lezioni' }).click();
     const boxes = window.locator('[data-view="courseLessons"] button');
     await expect(boxes).toHaveCount(3);
-    await boxes.first().click();
-    await window.getByLabel('Argomento / contenuti trattati').fill('Già svolta');
-    await window.locator('.fixed input[type="checkbox"]').check();
-    await window.getByRole('button', { name: 'Salva' }).last().click();
+    const lessonWin = await openLessonWindow(ctx.app, boxes.first());
+    await lessonWin.getByLabel('Argomento / contenuti trattati').fill('Già svolta');
+    await lessonWin.locator('input[type="checkbox"]').check();
+    await saveAndCloseLesson(lessonWin);
     await expect(boxes.first()).toHaveClass(/emerald/);
 
     // Modifica + Salva senza cambiare nulla: rigenera le lezioni programmate.
@@ -97,7 +97,7 @@ test.describe('Generazione calendario lezioni', () => {
     await window.getByRole('button', { name: 'Lezioni' }).click();
     await expect(boxes).toHaveCount(3);
     await expect(window.locator('[data-view="courseLessons"] button.bg-emerald-100')).toHaveCount(1);
-    await boxes.first().click();
-    await expect(window.getByLabel('Argomento / contenuti trattati')).toHaveValue('Già svolta');
+    const reopened = await openLessonWindow(ctx.app, boxes.first());
+    await expect(reopened.getByLabel('Argomento / contenuti trattati')).toHaveValue('Già svolta');
   });
 });
