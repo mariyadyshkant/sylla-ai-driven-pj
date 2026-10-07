@@ -3,6 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const db = require('./db');
+
+// Nei test (e negli script di verifica) le finestre restano invisibili e non rubano il focus,
+// altrimenti ogni avvio fa lampeggiare lo schermo e blocca l'uso del computer.
+const hideWindows = process.env.SYLLA_HIDE_WINDOWS === '1';
+const windowDefaults = {
+  show: !hideWindows,
+  // una finestra nascosta non deve essere "rallentata" dal browser, o gli screenshot e i test si bloccano
+  webPreferences: { backgroundThrottling: !hideWindows },
+};
 const transcription = require('./transcription');
 const aiNotes = require('./ai-notes');
 
@@ -39,6 +48,7 @@ function stopStudyStatsServer() {
 
 function createWindow() {
   const win = new BrowserWindow({
+    show: windowDefaults.show,
     width: 1280,
     height: 820,
     minWidth: 1024,
@@ -47,6 +57,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      ...windowDefaults.webPreferences,
     },
   });
 
@@ -72,11 +83,12 @@ function broadcast(channel, payload) {
 function openLessonWindow(lessonId) {
   const existing = lessonWindows.get(lessonId);
   if (existing && !existing.isDestroyed()) {
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
+    if (!hideWindows && existing.isMinimized()) existing.restore();
+    if (!hideWindows) existing.focus();
     return;
   }
   const win = new BrowserWindow({
+    show: windowDefaults.show,
     width: 800,
     height: 700,
     minWidth: 520,
@@ -89,6 +101,7 @@ function openLessonWindow(lessonId) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      ...windowDefaults.webPreferences,
     },
   });
   win.removeMenu();
@@ -106,10 +119,11 @@ const slidesWindows = new Map();
 function openSlidesWindow(lessonId, slidesPath) {
   const existing = slidesWindows.get(lessonId);
   if (existing && !existing.isDestroyed()) {
-    existing.focus();
+    if (!hideWindows) existing.focus();
     return;
   }
   const win = new BrowserWindow({
+    show: windowDefaults.show,
     width: 900,
     height: 700,
     minWidth: 520,
@@ -121,6 +135,7 @@ function openSlidesWindow(lessonId, slidesPath) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      ...windowDefaults.webPreferences,
     },
   });
   win.removeMenu();
@@ -276,6 +291,7 @@ function registerIpcHandlers() {
 }
 
 app.whenReady().then(() => {
+  if (hideWindows && process.platform === 'darwin') app.dock.hide(); // niente icona che rimbalza né attivazione
   db.init();
   registerIpcHandlers();
   startStudyStatsServer();

@@ -6,6 +6,8 @@ const fs = require('fs');
 async function launchApp(extraEnv = {}) {
   const dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sylla-test-')), 'sylla.db');
   const env = { ...process.env, SYLLA_DB_PATH: dbPath, NODE_ENV: 'test', SYLLA_STUDY_STATS_PORT: '4175', ...extraEnv };
+  // Finestre invisibili e senza focus durante i test; per vederle: SYLLA_SHOW_WINDOWS=1 npx playwright test
+  if (!process.env.SYLLA_SHOW_WINDOWS) env.SYLLA_HIDE_WINDOWS = '1';
   // Some host shells (e.g. terminals embedded in an Electron app) export this,
   // which forces any Electron binary to run as plain Node and reject its own CLI flags.
   delete env.ELECTRON_RUN_AS_NODE;
