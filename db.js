@@ -55,7 +55,15 @@ function init() {
       value TEXT
     );
   `);
+  migrateLessons();
   return db;
+}
+
+// Colonne aggiunte dopo la prima release: ALTER solo se mancanti.
+function migrateLessons() {
+  const cols = db.prepare('PRAGMA table_info(lessons)').all().map((c) => c.name);
+  if (!cols.includes('transcript')) db.exec("ALTER TABLE lessons ADD COLUMN transcript TEXT DEFAULT ''");
+  if (!cols.includes('ai_notes')) db.exec("ALTER TABLE lessons ADD COLUMN ai_notes TEXT DEFAULT ''");
 }
 
 function getDb() {
@@ -236,14 +244,28 @@ function getLesson(id) {
 function updateLesson(id, input) {
   getDb()
     .prepare(
-      `UPDATE lessons SET status = ?, topic = ?, notes = ?, recording_link = ? WHERE id = ?`
+      `UPDATE lessons SET status = ?, topic = ?, notes = ?, recording_link = ?, transcript = ?, ai_notes = ? WHERE id = ?`
     )
-    .run(input.status, input.topic || '', input.notes || '', input.recording_link || '', id);
+    .run(
+      input.status,
+      input.topic || '',
+      input.notes || '',
+      input.recording_link || '',
+      input.transcript || '',
+      input.ai_notes || '',
+      id
+    );
   getDb().prepare('DELETE FROM lesson_materials WHERE lesson_id = ?').run(id);
   const stmt = getDb().prepare('INSERT INTO lesson_materials (lesson_id, label, url) VALUES (?, ?, ?)');
   for (const m of input.materials || []) {
     stmt.run(id, m.label, m.url || '');
   }
+  return getLesson(id);
+}
+
+function setLessonField(id, field, value) {
+  if (!['transcript', 'ai_notes'].includes(field)) throw new Error(`Campo non ammesso: ${field}`);
+  getDb().prepare(`UPDATE lessons SET ${field} = ? WHERE id = ?`).run(value, id);
   return getLesson(id);
 }
 
@@ -332,6 +354,7 @@ module.exports = {
   listAllLessons,
   getLesson,
   updateLesson,
+  setLessonField,
   getSettings,
   setSetting,
   exportBackup,
