@@ -2,7 +2,7 @@
 
 **Progetto:** Sylla
 **Data:** 2026-06-25
-**Autore:** 
+**Autore:** Mariya Dyshkant
 
 ## Decisione
 
@@ -55,4 +55,6 @@ L'app è pensata per uso personale e single-user. Deve risolvere il problema di 
 
 ## Feature future pianificate
 
-
+- Tentare il download automatico della registrazione dal link, valutato piattaforma per piattaforma (Teams, Panopto, Zoom)
+- Supporto multi-lingua nell'interfaccia
+- Sincronizzazione opzionale del database su cloud personale (es. Dropbox, iCloud Drive)
