@@ -166,4 +166,53 @@ test.describe('Gestione lezioni', () => {
     await expect(reopened.getByLabel('Note elaborate (AI)')).toBeVisible();
     await expect(reopened.getByLabel('Note elaborate (AI)')).toHaveValue(markdown);
   });
+
+  test('i riquadri lezione mostrano numero progressivo, data, argomento e stato', async () => {
+    const { app, window } = ctx;
+    // Tre lunedì nel passato: tre settimane diverse, una lezione per settimana.
+    await createCourse(window, 'Corso Riquadri', new Date('2024-01-01T00:00:00'), new Date('2024-01-15T00:00:00'));
+    await window.getByRole('button', { name: 'Lezioni', exact: true }).click();
+
+    const cards = window.locator('[data-view="courseLessons"] button[data-status]');
+    await expect(cards).toHaveCount(3);
+    await expect(window.locator('[data-view="courseLessons"] h4')).toHaveCount(3);
+
+    // numero progressivo sul corso (non per settimana), in ordine di data
+    for (let i = 0; i < 3; i++) {
+      await expect(cards.nth(i)).toContainText(String(i + 1));
+    }
+    await expect(cards.nth(2)).toContainText('15 gen');
+
+    // dimensioni circa 200x120
+    const box = await cards.first().boundingBox();
+    expect(Math.round(box.width)).toBe(200);
+    expect(Math.round(box.height)).toBe(120);
+
+    // nessun argomento: segnaposto; passata non compilata: stato "overdue"
+    await expect(cards.first()).toContainText('Lezione non ancora compilata');
+    await expect(cards.first()).toHaveAttribute('data-status', 'overdue');
+
+    // compila e segna come svolta la seconda: mostra l'argomento, troncato a 2 righe, stato "done"
+    const lessonWin = await openLessonWindow(app, cards.nth(1));
+    const topic = 'Un argomento molto lungo che occupa più righe del riquadro e deve essere troncato con i puntini di sospensione alla seconda riga';
+    await lessonWin.getByLabel('Argomento / contenuti trattati').fill(topic);
+    await lessonWin.locator('input[type="checkbox"]').check();
+    await saveAndCloseLesson(lessonWin);
+
+    await expect(cards.nth(1)).toHaveAttribute('data-status', 'done');
+    await expect(cards.nth(1)).toContainText(topic);
+    await expect(cards.nth(1)).not.toContainText('Lezione non ancora compilata');
+    const clamp = await cards.nth(1).getByText(topic).evaluate((el) => getComputedStyle(el).webkitLineClamp);
+    expect(clamp).toBe('2');
+    await expect(cards.nth(0)).toHaveAttribute('data-status', 'overdue');
+  });
+
+  test('una lezione futura non ancora svolta ha stato "upcoming"', async () => {
+    const { window } = ctx;
+    await createCourse(window, 'Corso Futuro', new Date('2099-01-05T00:00:00'), new Date('2099-01-12T00:00:00'));
+    await window.getByRole('button', { name: 'Lezioni', exact: true }).click();
+    const cards = window.locator('[data-view="courseLessons"] button[data-status]');
+    await expect(cards).toHaveCount(2);
+    await expect(cards.first()).toHaveAttribute('data-status', 'upcoming');
+  });
 });

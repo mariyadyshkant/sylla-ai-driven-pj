@@ -331,14 +331,24 @@
                     <h4 class="mb-4 text-sm font-semibold text-slate-600 uppercase tracking-[0.2em] border-b border-slate-200 pb-2">
                       Settimana <span x-text="group.week"></span>
                     </h4>
-                    <div class="flex flex-wrap gap-3">
-                      <template x-for="(lesson, idx) in group.lessons" :key="lesson.id">
+                    <div class="flex flex-wrap gap-4">
+                      <template x-for="lesson in group.lessons" :key="lesson.id">
                         <button
                           @click="openLessonWindow(lesson)"
-                          class="h-24 w-24 rounded-3xl border flex items-center justify-center text-sm font-semibold shadow-sm transition"
+                          :title="lessonStatusLabel(lesson)"
+                          class="relative h-[120px] w-[200px] rounded-2xl border border-l-4 p-3 text-left flex flex-col shadow-sm transition hover:shadow-md"
                           :class="lessonStatusClass(lesson)"
+                          :data-status="lessonStatusKind(lesson)"
                         >
-                          <span x-text="idx + 1"></span>
+                          <span class="absolute top-3 right-3 h-2.5 w-2.5 rounded-full" :class="lessonStatusDot(lesson)"></span>
+                          <span class="text-3xl font-semibold leading-none" x-text="lesson.number"></span>
+                          <span class="mt-1 text-xs uppercase tracking-wide opacity-70" x-text="lessonDateLabel(lesson)"></span>
+                          <template x-if="lesson.topic && lesson.topic.trim()">
+                            <span class="mt-2 text-sm leading-snug line-clamp-2" x-text="lesson.topic"></span>
+                          </template>
+                          <template x-if="!(lesson.topic && lesson.topic.trim())">
+                            <span class="mt-2 text-sm italic text-slate-400">Lezione non ancora compilata</span>
+                          </template>
                         </button>
                       </template>
                     </div>

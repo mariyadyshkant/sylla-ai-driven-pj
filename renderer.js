@@ -236,23 +236,44 @@ function appFactory() {
       if (!this.selectedCourse) return [];
       const start = new Date(this.selectedCourse.start_date + 'T00:00:00');
       const groups = new Map();
-      for (const lesson of this.lessons) {
+      // Le lezioni arrivano già ordinate per data/ora: il numero è progressivo su tutto il corso.
+      this.lessons.forEach((lesson, index) => {
         const d = new Date(lesson.date + 'T00:00:00');
         const diffDays = Math.floor((startOfWeek(d) - startOfWeek(start)) / (1000 * 60 * 60 * 24));
         const week = Math.floor(diffDays / 7) + 1;
         if (!groups.has(week)) groups.set(week, []);
-        groups.get(week).push(lesson);
-      }
+        groups.get(week).push({ ...lesson, number: index + 1 });
+      });
       return [...groups.entries()]
         .sort((a, b) => a[0] - b[0])
         .map(([week, lessons]) => ({ week, lessons }));
     },
 
+    // 'done' = svolta e compilata, 'overdue' = passata non compilata, 'upcoming' = programmata futura
+    lessonStatusKind(lesson) {
+      if (lesson.status === 'svolta') return 'done';
+      return lesson.date < toISODate(new Date()) ? 'overdue' : 'upcoming';
+    },
+
     lessonStatusClass(lesson) {
-      if (lesson.status === 'svolta') return 'bg-emerald-100 border-emerald-300 text-emerald-800';
-      const today = toISODate(new Date());
-      if (lesson.date < today) return 'bg-amber-100 border-amber-300 text-amber-800';
-      return 'bg-[#fbf9f3] border-slate-200 text-slate-600';
+      const kind = this.lessonStatusKind(lesson);
+      if (kind === 'done') return 'bg-emerald-100 border-emerald-200 border-l-emerald-500 text-emerald-900';
+      if (kind === 'overdue') return 'bg-amber-100 border-amber-200 border-l-amber-500 text-amber-900';
+      return 'bg-[#fbf9f3] border-slate-200 border-l-slate-400 text-slate-700';
+    },
+
+    lessonStatusDot(lesson) {
+      const kind = this.lessonStatusKind(lesson);
+      return kind === 'done' ? 'bg-emerald-500' : kind === 'overdue' ? 'bg-amber-500' : 'bg-slate-400';
+    },
+
+    lessonStatusLabel(lesson) {
+      const kind = this.lessonStatusKind(lesson);
+      return kind === 'done' ? 'Svolta e compilata' : kind === 'overdue' ? 'Passata, da compilare' : 'Programmata';
+    },
+
+    lessonDateLabel(lesson) {
+      return new Date(lesson.date + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
     },
 
     openLessonWindow(lesson) {
