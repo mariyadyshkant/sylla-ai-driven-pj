@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('api', {
     listAll: (status) => ipcRenderer.invoke('lessons:listAll', status),
     get: (id) => ipcRenderer.invoke('lessons:get', id),
     update: (id, input) => ipcRenderer.invoke('lessons:update', id, input),
+    onChanged: (cb) => ipcRenderer.on('lessons:changed', (_e, payload) => cb(payload)),
+  },
+  lessonWindow: {
+    open: (lessonId) => ipcRenderer.invoke('lessonWindow:open', lessonId),
+    close: () => ipcRenderer.invoke('lessonWindow:close'),
   },
   transcription: {
     check: () => ipcRenderer.invoke('transcription:check'),

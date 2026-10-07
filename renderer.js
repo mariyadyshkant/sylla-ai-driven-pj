@@ -19,10 +19,6 @@ function emptyCourseForm() {
   };
 }
 
-function emptyLessonBuffer() {
-  return { id: null, date: '', start_time: '', end_time: '', status: 'programmata', topic: '', notes: '', recording_link: '', transcript: '', ai_notes: '', materials: [] };
-}
-
 function startOfWeek(date) {
   const d = new Date(date);
   const day = (d.getDay() + 6) % 7; // 0 = lunedì
@@ -59,9 +55,6 @@ function appFactory() {
     settings: { footer_text: '', header_image: '' },
     transcriptionSettings: { whisper_model: 'base', transcription_language: 'it', ai_api_key: '' },
     transcriptionSettingsMessage: '',
-    binaries: { ffmpeg: true, whisper: true },
-    transcriptionJob: null, // { lessonId, state, stage, percent, error }
-    aiJob: { running: false, error: '' },
     settingsTab: 'personalizzazione',
     footerDraft: '',
     backupMessage: '',
@@ -72,9 +65,6 @@ function appFactory() {
     courseEditForm: emptyCourseForm(),
     deleteStage: null,
 
-    showLessonModal: false,
-    editingLesson: emptyLessonBuffer(),
-
     calendarDate: new Date(),
     weekOffset: 0,
 
@@ -84,7 +74,7 @@ function appFactory() {
       this.loadTranscriptionSettings();
       await this.refreshCourses();
       await this.refreshAllLessons();
-      window.api.transcription.onProgress((p) => this.onTranscriptionProgress(p));
+      window.api.lessons.onChanged(() => this.onLessonsChanged());
     },
 
     async refreshCourses() {
@@ -265,88 +255,17 @@ function appFactory() {
       return 'bg-[#fbf9f3] border-slate-200 text-slate-600';
     },
 
-    openLessonModal(lesson) {
-      this.editingLesson = {
-        id: lesson.id,
-        date: lesson.date,
-        start_time: lesson.start_time,
-        end_time: lesson.end_time,
-        status: lesson.status,
-        topic: lesson.topic || '',
-        notes: lesson.notes || '',
-        recording_link: lesson.recording_link || '',
-        transcript: lesson.transcript || '',
-        ai_notes: lesson.ai_notes || '',
-        materials: (lesson.materials || []).map((m) => ({ ...m })),
-      };
-      this.aiJob = { running: false, error: '' };
-      this.showLessonModal = true;
+    openLessonWindow(lesson) {
+      window.api.lessonWindow.open(lesson.id);
     },
 
-    closeLessonModal() {
-      this.showLessonModal = false;
-    },
-
-    addMaterial() {
-      this.editingLesson.materials.push({ label: '', url: '' });
-    },
-
-    removeMaterial(index) {
-      this.editingLesson.materials.splice(index, 1);
-    },
-
-    async saveLesson() {
-      await window.api.lessons.update(this.editingLesson.id, plain(this.editingLesson));
-      this.lessons = await window.api.lessons.listByCourse(this.selectedCourse.id);
+    // La finestra della lezione salva/chiude: ricarica le liste mostrate qui.
+    async onLessonsChanged() {
       await this.refreshAllLessons();
-      this.showLessonModal = false;
+      if (this.selectedCourse) this.lessons = await window.api.lessons.listByCourse(this.selectedCourse.id);
     },
 
-    // ---- trascrizione e AI ----
-
-    transcriptionRunningHere() {
-      return this.transcriptionJob && this.transcriptionJob.lessonId === this.editingLesson.id
-        && this.transcriptionJob.state === 'running';
-    },
-
-    transcriptionLabel() {
-      const job = this.transcriptionJob;
-      if (!job || job.lessonId !== this.editingLesson.id) return '';
-      if (job.state === 'error') return job.error;
-      if (job.state !== 'running') return '';
-      const stages = { model: 'Download del modello', audio: 'Estrazione audio', transcribing: 'Trascrizione' };
-      return `${stages[job.stage] || 'Elaborazione'}… ${job.percent || 0}%`;
-    },
-
-    async startTranscription() {
-      this.binaries = await window.api.transcription.check();
-      const result = await window.api.transcription.start(this.editingLesson.id);
-      if (result.canceled) return;
-      this.transcriptionJob = { lessonId: this.editingLesson.id, state: 'running', stage: 'model', percent: 0 };
-    },
-
-    async onTranscriptionProgress(p) {
-      this.transcriptionJob = { ...this.transcriptionJob, ...p };
-      if (p.state === 'done') {
-        if (this.selectedCourse) this.lessons = await window.api.lessons.listByCourse(this.selectedCourse.id);
-        // Il modale aperto sulla stessa lezione riceve subito il testo.
-        if (this.showLessonModal && this.editingLesson.id === p.lessonId) this.editingLesson.transcript = p.transcript;
-      }
-    },
-
-    async generateAiNotes() {
-      this.aiJob = { running: true, error: '' };
-      try {
-        const { ai_notes } = await window.api.ai.generateNotes({
-          transcript: this.editingLesson.transcript,
-          topic: this.editingLesson.topic,
-        });
-        this.editingLesson.ai_notes = ai_notes;
-        this.aiJob = { running: false, error: '' };
-      } catch (err) {
-        this.aiJob = { running: false, error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') };
-      }
-    },
+    // ---- trascrizione e AI (impostazioni) ----
 
     loadTranscriptionSettings() {
       this.transcriptionSettings = {

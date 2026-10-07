@@ -59,6 +59,46 @@ function createWindow() {
 // Lavori di trascrizione in corso, per lezione: l'app resta usabile nel frattempo.
 const transcriptionJobs = new Map();
 
+// Finestre "blocco note" delle lezioni, una per lezione.
+const lessonWindows = new Map();
+
+function broadcast(channel, payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(channel, payload);
+  }
+}
+
+function openLessonWindow(lessonId) {
+  const existing = lessonWindows.get(lessonId);
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.focus();
+    return;
+  }
+  const win = new BrowserWindow({
+    width: 800,
+    height: 700,
+    minWidth: 520,
+    minHeight: 420,
+    resizable: true,
+    backgroundColor: '#faf8f3',
+    autoHideMenuBar: true,
+    title: 'Lezione — Sylla',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  win.removeMenu();
+  win.loadFile('lesson.html', { query: { id: String(lessonId) } });
+  lessonWindows.set(lessonId, win);
+  win.on('closed', () => {
+    lessonWindows.delete(lessonId);
+    broadcast('lessons:changed', { lessonId });
+  });
+}
+
 function emitTranscription(lessonId, payload) {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('transcription:progress', { lessonId, ...payload });
@@ -75,6 +115,7 @@ async function runTranscription(lessonId, inputPath) {
     });
     db.setLessonField(lessonId, 'transcript', text);
     emitTranscription(lessonId, { state: 'done', transcript: text });
+    broadcast('lessons:changed', { lessonId });
   } catch (err) {
     emitTranscription(lessonId, { state: 'error', error: err.message });
   } finally {
@@ -94,7 +135,17 @@ function registerIpcHandlers() {
   ipcMain.handle('lessons:listByCourse', (_e, courseId) => db.listLessonsByCourse(courseId));
   ipcMain.handle('lessons:listAll', (_e, status) => db.listAllLessons(status));
   ipcMain.handle('lessons:get', (_e, id) => db.getLesson(id));
-  ipcMain.handle('lessons:update', (_e, id, input) => db.updateLesson(id, input));
+  ipcMain.handle('lessons:update', (_e, id, input) => {
+    const lesson = db.updateLesson(id, input);
+    broadcast('lessons:changed', { lessonId: id });
+    return lesson;
+  });
+
+  ipcMain.handle('lessonWindow:open', (_e, lessonId) => openLessonWindow(lessonId));
+  ipcMain.handle('lessonWindow:close', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win) win.close();
+  });
 
   ipcMain.handle('transcription:check', () => {
     const { ffmpeg, whisper } = transcription.resolveBinaries(db.getSettings());

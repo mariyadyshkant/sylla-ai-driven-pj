@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lezione — Sylla</title>
+    <style>
+      [x-cloak] { display: none !important; }
+      .note-field { font-family: ui-serif, Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.65; }
+      .note-field.mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 1.6; }
+      .note-field:focus { outline: none; background: #fffefb; }
+      .md { font-family: ui-serif, Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.65; color: #292524; }
+      .md h1 { font-size: 1.35rem; font-weight: 600; margin: 1.1rem 0 .5rem; }
+      .md h2 { font-size: 1.1rem; font-weight: 600; margin: 1.1rem 0 .4rem; }
+      .md h3, .md h4, .md h5, .md h6 { font-size: 1rem; font-weight: 600; margin: .9rem 0 .3rem; }
+      .md p { margin: .4rem 0; }
+      .md ul, .md ol { margin: .4rem 0 .4rem 1.4rem; }
+      .md ul { list-style: disc; }
+      .md ol { list-style: decimal; }
+      .md li { margin: .15rem 0; }
+      .md hr { border: 0; border-top: 1px solid #e7e5e4; margin: 1rem 0; }
+      .md code { font-family: ui-monospace, Menlo, monospace; font-size: .85em; background: #f1efe8; padding: 0 .25em; border-radius: 3px; }
+      .md > :first-child { margin-top: 0; }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="lesson.js" defer></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  </head>
+  <body class="h-screen bg-[#faf8f3] text-slate-800 overflow-hidden" x-data="lessonEditor()" x-init="init()">
+    <div class="h-full flex flex-col" x-show="loaded" x-cloak>
+      <!-- intestazione fissa -->
+      <header class="shrink-0 px-10 pt-6 pb-4 bg-[#faf8f3] border-b border-stone-200 flex items-end justify-between gap-6">
+        <div class="min-w-0">
+          <p class="text-xs uppercase tracking-[0.25em] text-stone-500 truncate" x-text="course ? course.name : ''" data-testid="lesson-course"></p>
+          <p class="mt-1 text-lg font-serif text-stone-800" x-text="headerLine()" data-testid="lesson-datetime"></p>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-stone-600 shrink-0">
+          <input type="checkbox" :checked="lesson.status === 'svolta'" @change="lesson.status = $event.target.checked ? 'svolta' : 'programmata'" />
+          Segna come svolta
+        </label>
+      </header>
+
+      <!-- campi in colonna, scorrevoli -->
+      <main class="flex-1 overflow-y-auto px-10 py-8 space-y-9">
+        <div>
+          <label for="lesson-topic-input" class="block text-[11px] uppercase tracking-[0.2em] text-stone-400 mb-2">Argomento / contenuti trattati</label>
+          <textarea id="lesson-topic-input" x-model="lesson.topic" rows="2" class="note-field w-full bg-transparent resize-none"></textarea>
+        </div>
+
+        <div>
+          <div class="flex items-baseline justify-between mb-2">
+            <span class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Materiali e link</span>
+            <button type="button" @click="addMaterial()" class="text-xs text-stone-500 underline">+ Aggiungi materiale</button>
+          </div>
+          <div class="space-y-1">
+            <template x-for="(m, idx) in lesson.materials" :key="idx">
+              <div class="flex items-center gap-3">
+                <input x-model="m.label" placeholder="Nome" class="note-field mono flex-1 bg-transparent py-1" />
+                <input x-model="m.url" placeholder="Link" class="note-field mono flex-1 bg-transparent py-1" />
+                <button type="button" @click="removeMaterial(idx)" class="text-stone-400 hover:text-red-600 text-sm" aria-label="Rimuovi materiale">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <label for="lesson-notes-input" class="block text-[11px] uppercase tracking-[0.2em] text-stone-400 mb-2">Note libere</label>
+          <textarea id="lesson-notes-input" x-model="lesson.notes" rows="5" class="note-field w-full bg-transparent resize-y"></textarea>
+        </div>
+
+        <div>
+          <label for="lesson-recording-link-input" class="block text-[11px] uppercase tracking-[0.2em] text-stone-400 mb-2">Link alla registrazione</label>
+          <input id="lesson-recording-link-input" x-model="lesson.recording_link" class="note-field mono w-full bg-transparent py-1" />
+        </div>
+
+        <div>
+          <div class="flex items-baseline justify-between mb-2">
+            <label for="lesson-transcript-input" class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Trascrizione</label>
+            <button type="button" @click="startTranscription()" :disabled="transcriptionRunning()" class="text-xs text-stone-500 underline disabled:opacity-40">Carica file audio/video</button>
+          </div>
+          <p x-show="!binaries.ffmpeg || !binaries.whisper" x-cloak class="text-xs text-amber-700 mb-1">ffmpeg o whisper.cpp non trovati: installali (es. "brew install ffmpeg whisper-cpp") per trascrivere.</p>
+          <p x-show="transcriptionLabel()" x-cloak class="text-xs mb-1" :class="transcriptionJob && transcriptionJob.state === 'error' ? 'text-red-600' : 'text-stone-500'" x-text="transcriptionLabel()"></p>
+          <textarea id="lesson-transcript-input" x-model="lesson.transcript" rows="10" class="note-field mono w-full bg-transparent resize-y"></textarea>
+        </div>
+
+        <div class="pb-4">
+          <div class="flex items-baseline justify-between mb-2">
+            <label for="lesson-ai-notes-input" class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Note elaborate (AI)</label>
+            <span class="flex items-baseline gap-4">
+              <button type="button" x-show="lesson.ai_notes.trim()" x-cloak @click="aiEditing = !aiEditing" class="text-xs text-stone-500 underline" x-text="showAiPreview() ? 'Modifica' : 'Anteprima'" data-testid="ai-toggle"></button>
+              <button type="button" @click="generateAiNotes()" :disabled="!lesson.transcript.trim() || aiJob.running" class="text-xs text-stone-500 underline disabled:opacity-40" x-text="aiJob.running ? 'Elaborazione…' : 'Elabora in note'"></button>
+            </span>
+          </div>
+          <p x-show="aiJob.error" x-cloak class="text-xs text-red-600 mb-1" x-text="aiJob.error"></p>
+          <div x-show="showAiPreview()" x-cloak class="md" data-testid="ai-preview" x-html="aiPreviewHtml()"></div>
+          <textarea id="lesson-ai-notes-input" x-show="!showAiPreview()" x-model="lesson.ai_notes" rows="10" class="note-field w-full bg-transparent resize-y"></textarea>
+        </div>
+      </main>
+
+      <!-- pulsanti fissi -->
+      <footer class="shrink-0 px-10 py-4 bg-[#faf8f3] border-t border-stone-200 flex items-center gap-4">
+        <button @click="save()" class="rounded-md bg-stone-800 text-white px-6 py-2 text-sm">Salva</button>
+        <button @click="close()" class="rounded-md border border-stone-300 text-stone-700 px-6 py-2 text-sm">Chiudi</button>
+        <span x-show="savedMessage" x-cloak class="text-sm text-emerald-700" x-text="savedMessage"></span>
+      </footer>
+    </div>
+  </body>
+</html>
