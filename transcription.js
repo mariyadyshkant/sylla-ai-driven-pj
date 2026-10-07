@@ -112,7 +112,7 @@ async function transcribeFile({ inputPath, settings, userDataDir, onProgress }) 
       ['-m', model, '-f', wav, '-l', language, '-nt', '-pp', '-otxt', '-of', outBase],
       (text) => {
         const m = [...text.matchAll(/progress\s*=\s*(\d+)%/g)].pop();
-        if (m) onProgress({ stage: 'transcribing', percent: Number(m[1]) });
+        if (m) onProgress({ stage: 'transcribing', percent: Math.min(100, Number(m[1])) });
       }
     );
     return fs.readFileSync(`${outBase}.txt`, 'utf8').trim();
