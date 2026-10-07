@@ -50,8 +50,13 @@ test.describe('Slide della lezione', () => {
       let body = '';
       req.on('data', (c) => (body += c));
       req.on('end', () => {
-        aiRequests.push(JSON.parse(body));
+        const parsed = JSON.parse(body);
         res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (parsed.system.startsWith('Ripulisci')) {
+          res.end(JSON.stringify({ content: [{ type: 'text', text: parsed.messages[0].content }], stop_reason: 'end_turn' }));
+          return;
+        }
+        aiRequests.push(parsed);
         res.end(JSON.stringify({ content: [{ type: 'text', text: 'Note di prova' }] }));
       });
     });

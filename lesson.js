@@ -76,7 +76,7 @@ function lessonEditorFactory() {
     savedMessage: '',
     binaries: { ffmpeg: true, whisper: true },
     transcriptionJob: null, // { state, stage, percent, error }
-    aiJob: { running: false, error: '', warning: '', note: '' },
+    aiJob: { running: false, error: '', warning: '', note: '', cleanup: null },
     slidesPath: '',
     slidesError: '',
     aiEditing: false, // false = anteprima formattata (se ci sono note), true = testo Markdown modificabile
@@ -139,6 +139,19 @@ function lessonEditorFactory() {
       this.slidesError = '';
     },
 
+    // Indica se la trascrizione è stata ripulita prima di generare le note (il testo salvato non cambia).
+    cleanupBadge() {
+      const c = this.aiJob.cleanup;
+      if (!c) return null;
+      if (c.cleaned === c.total) {
+        return { text: '✓ trascrizione migliorata', kind: 'ok', title: 'Prima di generare le note la trascrizione è stata ripulita (punteggiatura, paragrafi, errori di riconoscimento evidenti). Il testo salvato nella lezione non è stato modificato.' };
+      }
+      if (c.cleaned > 0) {
+        return { text: `trascrizione migliorata in parte (${c.cleaned}/${c.total})`, kind: 'partial', title: 'Alcuni pezzi della trascrizione non si sono potuti ripulire e sono stati usati come registrati. Il testo salvato non è stato modificato.' };
+      }
+      return { text: 'trascrizione originale usata', kind: 'none', title: 'La pulizia della trascrizione non è riuscita: le note sono state generate dal testo originale.' };
+    },
+
     aiPreviewHtml() {
       return renderMarkdown(this.lesson.ai_notes);
     },
@@ -195,16 +208,16 @@ function lessonEditorFactory() {
     },
 
     async generateAiNotes() {
-      this.aiJob = { running: true, error: '', warning: '', note: '' };
+      this.aiJob = { running: true, error: '', warning: '', note: '', cleanup: null };
       try {
-        const { ai_notes, slidesWarning, slidesNote } = await window.api.ai.generateNotes({
+        const { ai_notes, slidesWarning, slidesNote, transcriptCleanup } = await window.api.ai.generateNotes({
           lessonId: this.lesson.id,
           transcript: this.lesson.transcript,
           topic: this.lesson.topic,
         });
         this.lesson.ai_notes = ai_notes;
         this.aiEditing = false;
-        this.aiJob = { running: false, error: '', warning: slidesWarning || '', note: slidesNote || '' };
+        this.aiJob = { running: false, error: '', warning: slidesWarning || '', note: slidesNote || '', cleanup: transcriptCleanup || null };
       } catch (err) {
         this.aiJob = { running: false, error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') };
       }

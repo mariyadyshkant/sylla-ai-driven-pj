@@ -202,13 +202,13 @@ function registerIpcHandlers() {
   // le slide, se allegate alla lezione, vengono lette dal database.
   ipcMain.handle('ai:generateNotes', async (_e, { lessonId, transcript, topic }) => {
     const lesson = lessonId ? db.getLesson(lessonId) : null;
-    const { notes, slidesWarning, slidesNote } = await aiNotes.generateNotes({
+    const { notes, slidesWarning, slidesNote, transcriptCleanup } = await aiNotes.generateNotes({
       transcript,
       topic,
       apiKey: db.getSettings().ai_api_key,
       slidesPath: lesson && lesson.slides_path,
     });
-    return { ai_notes: notes, slidesWarning, slidesNote };
+    return { ai_notes: notes, slidesWarning, slidesNote, transcriptCleanup };
   });
 
   ipcMain.handle('dialog:openFile', async (e, options = {}) => {

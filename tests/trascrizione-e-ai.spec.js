@@ -56,8 +56,14 @@ test.describe('Trascrizione e AI', () => {
       let body = '';
       req.on('data', (c) => (body += c));
       req.on('end', () => {
-        aiRequests.push({ headers: req.headers, body: JSON.parse(body) });
+        const parsed = JSON.parse(body);
         res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (parsed.system.startsWith('Ripulisci')) {
+          // passaggio di pulizia: restituisce il testo ricevuto (qui non serve verificarlo)
+          res.end(JSON.stringify({ content: [{ type: 'text', text: `${parsed.messages[0].content} (pulita)` }], stop_reason: 'end_turn' }));
+          return;
+        }
+        aiRequests.push({ headers: req.headers, body: parsed });
         res.end(JSON.stringify({ content: [{ type: 'text', text: 'Riassunto: lezione introduttiva' }] }));
       });
     });

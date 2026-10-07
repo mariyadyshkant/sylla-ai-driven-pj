@@ -100,7 +100,18 @@
 
         <div class="pb-4">
           <div class="flex items-baseline justify-between mb-2">
-            <label for="lesson-ai-notes-input" class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Note elaborate (AI)</label>
+            <div class="flex items-baseline gap-3">
+              <label for="lesson-ai-notes-input" class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Note elaborate (AI)</label>
+              <template x-if="cleanupBadge()">
+                <span
+                  class="text-[11px] rounded-full px-2 py-0.5 cursor-help"
+                  :class="cleanupBadge().kind === 'ok' ? 'bg-emerald-100 text-emerald-800' : cleanupBadge().kind === 'partial' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-600'"
+                  :title="cleanupBadge().title"
+                  x-text="cleanupBadge().text"
+                  data-testid="ai-cleanup-badge"
+                ></span>
+              </template>
+            </div>
             <span class="flex items-baseline gap-4">
               <button type="button" x-show="lesson.ai_notes.trim()" x-cloak @click="aiEditing = !aiEditing" class="text-xs text-stone-500 underline" x-text="showAiPreview() ? 'Modifica' : 'Anteprima'" data-testid="ai-toggle"></button>
               <button type="button" @click="generateAiNotes()" :disabled="!lesson.transcript.trim() || aiJob.running" class="text-xs text-stone-500 underline disabled:opacity-40" x-text="aiJob.running ? 'Elaborazione…' : 'Elabora in note'"></button>
