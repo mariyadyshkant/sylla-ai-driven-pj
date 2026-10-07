@@ -76,7 +76,7 @@ function lessonEditorFactory() {
     savedMessage: '',
     binaries: { ffmpeg: true, whisper: true },
     transcriptionJob: null, // { state, stage, percent, error }
-    aiJob: { running: false, error: '', warning: '' },
+    aiJob: { running: false, error: '', warning: '', note: '' },
     slidesPath: '',
     slidesError: '',
     aiEditing: false, // false = anteprima formattata (se ci sono note), true = testo Markdown modificabile
@@ -195,16 +195,16 @@ function lessonEditorFactory() {
     },
 
     async generateAiNotes() {
-      this.aiJob = { running: true, error: '', warning: '' };
+      this.aiJob = { running: true, error: '', warning: '', note: '' };
       try {
-        const { ai_notes, slidesWarning } = await window.api.ai.generateNotes({
+        const { ai_notes, slidesWarning, slidesNote } = await window.api.ai.generateNotes({
           lessonId: this.lesson.id,
           transcript: this.lesson.transcript,
           topic: this.lesson.topic,
         });
         this.lesson.ai_notes = ai_notes;
         this.aiEditing = false;
-        this.aiJob = { running: false, error: '', warning: slidesWarning || '' };
+        this.aiJob = { running: false, error: '', warning: slidesWarning || '', note: slidesNote || '' };
       } catch (err) {
         this.aiJob = { running: false, error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') };
       }

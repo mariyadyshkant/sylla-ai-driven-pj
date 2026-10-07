@@ -6,6 +6,8 @@ const path = require('path');
 const { launchApp, closeApp, openLessonWindow, saveAndCloseLesson } = require('./helpers');
 
 const FIXTURE_PDF = path.join(__dirname, 'fixtures', 'slides.pdf');
+// PDF senza testo selezionabile (solo un'immagine), come slide esportate come foto.
+const FIXTURE_IMAGE_PDF = path.join(__dirname, 'fixtures', 'slides-immagine.pdf');
 
 function iso(d) {
   const y = d.getFullYear();
@@ -118,6 +120,31 @@ test.describe('Slide della lezione', () => {
     expect(content).toContain('Oggi abbiamo parlato di agenti.');
     expect(content).toContain('\n\n---\nCONTENUTO SLIDE:\n');
     expect(content).toContain('ORCHESTRATORE');
+    await expect(lessonWin.getByTestId('ai-warning')).toBeHidden();
+  });
+
+  test('slide fatte di sole immagini: il PDF viene inviato all\'AI come documento, senza segnaposto vuoti', async () => {
+    const lessonWin = await openFirstLesson();
+    await pickFile(FIXTURE_IMAGE_PDF);
+    await lessonWin.getByTestId('slides-attach').click();
+    await expect(lessonWin.getByTestId('slides-name')).toHaveText('slides-immagine.pdf');
+
+    await lessonWin.getByLabel('Trascrizione').fill('Oggi abbiamo guardato delle slide.');
+    await lessonWin.getByRole('button', { name: 'Elabora in note' }).click();
+    await expect(lessonWin.getByLabel('Note elaborate (AI)')).toHaveValue('Note di prova');
+
+    expect(aiRequests).toHaveLength(1);
+    const content = aiRequests[0].messages[0].content;
+    expect(Array.isArray(content)).toBe(true);
+    const doc = content.find((b) => b.type === 'document');
+    expect(doc.source.media_type).toBe('application/pdf');
+    expect(Buffer.from(doc.source.data, 'base64').subarray(0, 4).toString()).toBe('%PDF');
+    const text = content.find((b) => b.type === 'text').text;
+    expect(text).toContain('Oggi abbiamo guardato delle slide.');
+    expect(text).toContain('CONTENUTO SLIDE');
+    expect(text).not.toMatch(/-- \d+ of \d+ --/); // i marcatori di pagina non sono contenuto
+
+    await expect(lessonWin.getByTestId('ai-note')).toContainText('non contengono testo selezionabile');
     await expect(lessonWin.getByTestId('ai-warning')).toBeHidden();
   });
 

@@ -108,6 +108,7 @@
           </div>
           <p x-show="aiJob.error" x-cloak class="text-xs text-red-600 mb-1" x-text="aiJob.error"></p>
           <p x-show="aiJob.warning" x-cloak class="text-xs text-amber-700 mb-1" x-text="aiJob.warning" data-testid="ai-warning"></p>
+          <p x-show="aiJob.note" x-cloak class="text-xs text-stone-500 mb-1" x-text="aiJob.note" data-testid="ai-note"></p>
           <div x-show="showAiPreview()" x-cloak class="md" data-testid="ai-preview" x-html="aiPreviewHtml()"></div>
           <textarea id="lesson-ai-notes-input" x-show="!showAiPreview()" x-model="lesson.ai_notes" rows="10" class="note-field w-full bg-transparent resize-y"></textarea>
         </div>

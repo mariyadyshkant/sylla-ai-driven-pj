@@ -13,40 +13,68 @@ const SYSTEM_PROMPT =
 
 // Oltre questo limite il testo delle slide viene troncato, per tenere sotto controllo il costo della chiamata.
 const MAX_SLIDES_CHARS = 60000;
+// L'API accetta PDF fino a 32 MB (base64 incluso) e 100 pagine.
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+const MAX_PDF_PAGES = 100;
 
 // Estrae il testo da un PDF. pdf-parse è caricato solo qui: serve unicamente se ci sono slide allegate.
+// I marcatori di pagina "-- 1 of 11 --" aggiunti da pdf-parse non contano come testo: un PDF fatto
+// di immagini (scansioni, esportazioni come foto) restituisce quindi testo vuoto.
 async function extractSlidesText(slidesPath) {
   const { PDFParse } = require('pdf-parse');
   const parser = new PDFParse({ data: fs.readFileSync(slidesPath) });
   try {
+    const { total } = await parser.getInfo();
     const { text } = await parser.getText();
-    return text.trim();
+    return { text: text.replace(/^-- \d+ of \d+ --$/gm, '').trim(), pages: total };
   } finally {
     await parser.destroy();
   }
 }
 
-// Ritorna { notes, slidesWarning }: se le slide non si leggono, le note si generano comunque dalla sola trascrizione.
+// Prepara il contesto delle slide: testo se il PDF ne ha, altrimenti il PDF stesso come documento
+// (l'API legge anche le immagini delle pagine). Se non si riesce, ritorna solo un avviso.
+async function prepareSlides(slidesPath) {
+  const out = { text: '', pdfBase64: '', warning: '', note: '' };
+  if (!slidesPath) return out;
+  try {
+    const { text, pages } = await extractSlidesText(slidesPath);
+    if (text) {
+      out.text = text.length > MAX_SLIDES_CHARS ? text.slice(0, MAX_SLIDES_CHARS) : text;
+      return out;
+    }
+    const size = fs.statSync(slidesPath).size;
+    if (pages > MAX_PDF_PAGES || size > MAX_PDF_BYTES) {
+      out.warning = `Le slide non contengono testo e sono troppo grandi per essere inviate (${pages} pagine, ${(size / 1048576).toFixed(1)} MB; massimo ${MAX_PDF_PAGES} pagine e ${MAX_PDF_BYTES / 1048576} MB): le note usano solo la trascrizione.`;
+      return out;
+    }
+    out.pdfBase64 = fs.readFileSync(slidesPath).toString('base64');
+    out.note = `Le slide non contengono testo selezionabile: il PDF (${pages} pagine) è stato inviato all'AI come immagini.`;
+  } catch (err) {
+    out.warning = `Impossibile leggere le slide allegate (${err.code === 'ENOENT' ? 'file non trovato' : err.message}): le note usano solo la trascrizione.`;
+  }
+  return out;
+}
+
+// Ritorna { notes, slidesWarning, slidesNote }: se le slide non si leggono, le note si generano comunque dalla sola trascrizione.
 async function generateNotes({ transcript, topic, apiKey, slidesPath }) {
   if (!apiKey) throw new Error('API key mancante: inseriscila in Impostazioni → Trascrizione e AI.');
   if (!transcript || !transcript.trim()) throw new Error('Nessuna trascrizione da elaborare.');
 
-  let slidesText = '';
-  let slidesWarning = '';
-  if (slidesPath) {
-    try {
-      slidesText = await extractSlidesText(slidesPath);
-      if (!slidesText) slidesWarning = 'Le slide allegate non contengono testo estraibile (forse sono immagini): le note usano solo la trascrizione.';
-    } catch (err) {
-      slidesWarning = `Impossibile leggere le slide allegate (${err.code === 'ENOENT' ? 'file non trovato' : err.message}): le note usano solo la trascrizione.`;
-    }
-  }
-  if (slidesText.length > MAX_SLIDES_CHARS) slidesText = slidesText.slice(0, MAX_SLIDES_CHARS);
-
-  const userContent =
-    (topic ? `Argomento dichiarato: ${topic}\n\n` : '') +
-    `Trascrizione:\n${transcript}` +
-    (slidesText ? `\n\n---\nCONTENUTO SLIDE:\n${slidesText}` : '');
+  const slides = await prepareSlides(slidesPath);
+  const slidesPart = slides.text
+    ? `\n\n---\nCONTENUTO SLIDE:\n${slides.text}`
+    : slides.pdfBase64
+      ? '\n\n---\nCONTENUTO SLIDE: sono nel documento PDF allegato.'
+      : '';
+  const text =
+    (topic ? `Argomento dichiarato: ${topic}\n\n` : '') + `Trascrizione:\n${transcript}` + slidesPart;
+  const userContent = slides.pdfBase64
+    ? [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: slides.pdfBase64 } },
+        { type: 'text', text },
+      ]
+    : text;
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -75,7 +103,7 @@ async function generateNotes({ transcript, topic, apiKey, slidesPath }) {
     .map((b) => b.text)
     .join('\n')
     .trim();
-  return { notes, slidesWarning };
+  return { notes, slidesWarning: slides.warning, slidesNote: slides.note };
 }
 
 module.exports = { generateNotes, extractSlidesText };
