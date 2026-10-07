@@ -90,8 +90,22 @@
 
         <div>
           <div class="flex items-baseline justify-between mb-2">
-            <label for="lesson-transcript-input" class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Trascrizione</label>
-            <button type="button" @click="startTranscription()" :disabled="transcriptionRunning()" class="text-xs text-stone-500 underline disabled:opacity-40">Carica file audio/video</button>
+            <div class="flex items-baseline gap-3">
+              <label for="lesson-transcript-input" class="text-[11px] uppercase tracking-[0.2em] text-stone-400">Trascrizione</label>
+              <template x-if="transcriptBadge()">
+                <span
+                  class="text-[11px] rounded-full px-2 py-0.5 cursor-help"
+                  :class="transcriptBadge().kind === 'ok' ? 'bg-emerald-100 text-emerald-800' : transcriptBadge().kind === 'partial' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-600'"
+                  :title="transcriptBadge().title"
+                  x-text="transcriptBadge().text"
+                  data-testid="transcript-badge"
+                ></span>
+              </template>
+            </div>
+            <span class="flex items-baseline gap-4">
+              <button type="button" x-show="canRestoreOriginal()" x-cloak @click="restoreOriginalTranscript()" class="text-xs text-stone-500 underline" data-testid="transcript-restore">Ripristina originale</button>
+              <button type="button" @click="startTranscription()" :disabled="transcriptionRunning()" class="text-xs text-stone-500 underline disabled:opacity-40">Carica file audio/video</button>
+            </span>
           </div>
           <p x-show="!binaries.ffmpeg || !binaries.whisper" x-cloak class="text-xs text-amber-700 mb-1">ffmpeg o whisper.cpp non trovati: installali (es. "brew install ffmpeg whisper-cpp") per trascrivere.</p>
           <p x-show="transcriptionLabel()" x-cloak class="text-xs mb-1" :class="transcriptionJob && transcriptionJob.state === 'error' ? 'text-red-600' : 'text-stone-500'" x-text="transcriptionLabel()"></p>

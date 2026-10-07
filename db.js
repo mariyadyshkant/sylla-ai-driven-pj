@@ -65,6 +65,10 @@ function migrateLessons() {
   if (!cols.includes('transcript')) db.exec("ALTER TABLE lessons ADD COLUMN transcript TEXT DEFAULT ''");
   if (!cols.includes('ai_notes')) db.exec("ALTER TABLE lessons ADD COLUMN ai_notes TEXT DEFAULT ''");
   if (!cols.includes('slides_path')) db.exec('ALTER TABLE lessons ADD COLUMN slides_path TEXT');
+  // Pulizia della trascrizione al caricamento: l'output grezzo di whisper resta in transcript_raw,
+  // transcript_cleanup è il JSON {cleaned,total} dei pezzi ripuliti.
+  if (!cols.includes('transcript_raw')) db.exec('ALTER TABLE lessons ADD COLUMN transcript_raw TEXT');
+  if (!cols.includes('transcript_cleanup')) db.exec('ALTER TABLE lessons ADD COLUMN transcript_cleanup TEXT');
 }
 
 function getDb() {
@@ -253,7 +257,7 @@ function getLesson(id) {
 function updateLesson(id, input) {
   getDb()
     .prepare(
-      `UPDATE lessons SET status = ?, topic = ?, notes = ?, recording_link = ?, transcript = ?, ai_notes = ? WHERE id = ?`
+      `UPDATE lessons SET status = ?, topic = ?, notes = ?, recording_link = ?, transcript = ?, ai_notes = ?, transcript_cleanup = ? WHERE id = ?`
     )
     .run(
       input.status,
@@ -262,6 +266,7 @@ function updateLesson(id, input) {
       input.recording_link || '',
       input.transcript || '',
       input.ai_notes || '',
+      input.transcript && input.transcript_cleanup ? input.transcript_cleanup : null,
       id
     );
   getDb().prepare('DELETE FROM lesson_materials WHERE lesson_id = ?').run(id);
@@ -273,7 +278,7 @@ function updateLesson(id, input) {
 }
 
 function setLessonField(id, field, value) {
-  if (!['transcript', 'ai_notes', 'slides_path'].includes(field)) throw new Error(`Campo non ammesso: ${field}`);
+  if (!['transcript', 'transcript_raw', 'transcript_cleanup', 'ai_notes', 'slides_path'].includes(field)) throw new Error(`Campo non ammesso: ${field}`);
   getDb().prepare(`UPDATE lessons SET ${field} = ? WHERE id = ?`).run(value, id);
   return getLesson(id);
 }

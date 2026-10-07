@@ -158,11 +158,12 @@ async function cleanTranscript(transcript, apiKey) {
 
 // Ritorna { notes, slidesWarning, slidesNote, transcriptCleanup }: se le slide non si leggono, le note si generano
 // comunque dalla sola trascrizione. La trascrizione ripulita serve solo come contesto: non viene salvata.
-async function generateNotes({ transcript, topic, apiKey, slidesPath }) {
+// Se la trascrizione è già stata ripulita al caricamento (`knownCleanup`), non viene ripulita di nuovo.
+async function generateNotes({ transcript, topic, apiKey, slidesPath, knownCleanup }) {
   if (!apiKey) throw new Error('API key mancante: inseriscila in Impostazioni → Trascrizione e AI.');
   if (!transcript || !transcript.trim()) throw new Error('Nessuna trascrizione da elaborare.');
 
-  const cleanup = await cleanTranscript(transcript, apiKey);
+  const cleanup = knownCleanup ? { text: transcript, ...knownCleanup } : await cleanTranscript(transcript, apiKey);
   const slides = await prepareSlides(slidesPath);
   const slidesPart = slides.text
     ? `\n\n---\nCONTENUTO SLIDE:\n${slides.text}`

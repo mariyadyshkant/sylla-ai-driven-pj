@@ -152,14 +152,34 @@ function emitTranscription(lessonId, payload) {
 
 async function runTranscription(lessonId, inputPath) {
   try {
-    const text = await transcription.transcribeFile({
+    const raw = await transcription.transcribeFile({
       inputPath,
       settings: db.getSettings(),
       userDataDir: process.env.SYLLA_DB_PATH ? path.dirname(process.env.SYLLA_DB_PATH) : app.getPath('userData'),
       onProgress: (p) => emitTranscription(lessonId, { state: 'running', ...p }),
     });
+
+    // Con una API key configurata, la trascrizione viene ripulita subito (punteggiatura, paragrafi,
+    // errori evidenti); l'output grezzo di whisper resta in transcript_raw. Se la pulizia non riesce,
+    // si tiene il testo grezzo: la trascrizione locale non dipende mai dall'AI.
+    let text = raw;
+    let rawKept = '';
+    let cleanup = null;
+    const apiKey = db.getSettings().ai_api_key;
+    if (apiKey && raw.trim()) {
+      emitTranscription(lessonId, { state: 'running', stage: 'cleanup', percent: 0 });
+      const result = await aiNotes.cleanTranscript(raw, apiKey);
+      cleanup = { cleaned: result.cleaned, total: result.total };
+      if (result.cleaned > 0) {
+        text = result.text;
+        rawKept = raw;
+      }
+    }
+    const cleanupJson = cleanup ? JSON.stringify(cleanup) : '';
     db.setLessonField(lessonId, 'transcript', text);
-    emitTranscription(lessonId, { state: 'done', transcript: text });
+    db.setLessonField(lessonId, 'transcript_raw', rawKept || null);
+    db.setLessonField(lessonId, 'transcript_cleanup', cleanupJson || null);
+    emitTranscription(lessonId, { state: 'done', transcript: text, transcript_raw: rawKept, transcript_cleanup: cleanupJson });
     broadcast('lessons:changed', { lessonId });
   } catch (err) {
     emitTranscription(lessonId, { state: 'error', error: err.message });
@@ -215,13 +235,14 @@ function registerIpcHandlers() {
 
   // Usa la trascrizione passata dalla finestra (può contenere correzioni non ancora salvate);
   // le slide, se allegate alla lezione, vengono lette dal database.
-  ipcMain.handle('ai:generateNotes', async (_e, { lessonId, transcript, topic }) => {
+  ipcMain.handle('ai:generateNotes', async (_e, { lessonId, transcript, topic, knownCleanup }) => {
     const lesson = lessonId ? db.getLesson(lessonId) : null;
     const { notes, slidesWarning, slidesNote, transcriptCleanup } = await aiNotes.generateNotes({
       transcript,
       topic,
       apiKey: db.getSettings().ai_api_key,
       slidesPath: lesson && lesson.slides_path,
+      knownCleanup,
     });
     return { ai_notes: notes, slidesWarning, slidesNote, transcriptCleanup };
   });

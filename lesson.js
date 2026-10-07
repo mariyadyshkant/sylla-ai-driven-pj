@@ -71,7 +71,7 @@ function lessonEditorFactory() {
   return {
     loaded: false,
     course: null,
-    lesson: { id: null, date: '', start_time: '', end_time: '', status: 'programmata', topic: '', notes: '', recording_link: '', transcript: '', ai_notes: '', materials: [] },
+    lesson: { id: null, date: '', start_time: '', end_time: '', status: 'programmata', topic: '', notes: '', recording_link: '', transcript: '', ai_notes: '', transcript_raw: '', transcript_cleanup: '', materials: [] },
 
     savedMessage: '',
     binaries: { ffmpeg: true, whisper: true },
@@ -96,6 +96,8 @@ function lessonEditorFactory() {
         recording_link: lesson.recording_link || '',
         transcript: lesson.transcript || '',
         ai_notes: lesson.ai_notes || '',
+        transcript_raw: lesson.transcript_raw || '',
+        transcript_cleanup: lesson.transcript_cleanup || '',
         materials: (lesson.materials || []).map((m) => ({ ...m })),
       };
       this.slidesPath = lesson.slides_path || '';
@@ -139,17 +141,28 @@ function lessonEditorFactory() {
       this.slidesError = '';
     },
 
-    // Indica se la trascrizione è stata ripulita prima di generare le note (il testo salvato non cambia).
-    cleanupBadge() {
-      const c = this.aiJob.cleanup;
+    // Etichetta dell'esito della pulizia ({cleaned, total}); `where` dice a cosa si riferisce.
+    badgeFor(c, where) {
       if (!c) return null;
+      const saved = where === 'transcript';
       if (c.cleaned === c.total) {
-        return { text: '✓ trascrizione migliorata', kind: 'ok', title: 'Prima di generare le note la trascrizione è stata ripulita (punteggiatura, paragrafi, errori di riconoscimento evidenti). Il testo salvato nella lezione non è stato modificato.' };
+        return {
+          text: '✓ trascrizione migliorata',
+          kind: 'ok',
+          title: saved
+            ? "La trascrizione è stata ripulita (punteggiatura, paragrafi, errori di riconoscimento evidenti). L'output originale di whisper è conservato: «Ripristina originale»."
+            : "Le note sono state generate da una trascrizione ripulita (punteggiatura, paragrafi, errori evidenti). Il testo salvato nella lezione non è stato modificato.",
+        };
       }
       if (c.cleaned > 0) {
-        return { text: `trascrizione migliorata in parte (${c.cleaned}/${c.total})`, kind: 'partial', title: 'Alcuni pezzi della trascrizione non si sono potuti ripulire e sono stati usati come registrati. Il testo salvato non è stato modificato.' };
+        return { text: `trascrizione migliorata in parte (${c.cleaned}/${c.total})`, kind: 'partial', title: 'Alcuni pezzi della trascrizione non si sono potuti ripulire e sono rimasti come registrati.' };
       }
-      return { text: 'trascrizione originale usata', kind: 'none', title: 'La pulizia della trascrizione non è riuscita: le note sono state generate dal testo originale.' };
+      return { text: saved ? 'pulizia non riuscita' : 'trascrizione originale usata', kind: 'none', title: 'La pulizia della trascrizione non è riuscita: si è usato il testo originale.' };
+    },
+
+    // Badge accanto alle note: descrive l'ultima generazione (solo finché la finestra è aperta).
+    cleanupBadge() {
+      return this.badgeFor(this.aiJob.cleanup, 'notes');
     },
 
     aiPreviewHtml() {
@@ -190,8 +203,8 @@ function lessonEditorFactory() {
       if (!job) return '';
       if (job.state === 'error') return job.error;
       if (job.state !== 'running') return '';
-      const stages = { model: 'Download del modello', audio: 'Estrazione audio', transcribing: 'Trascrizione' };
-      return `${stages[job.stage] || 'Elaborazione'}… ${job.percent || 0}%`;
+      const stages = { model: 'Download del modello', audio: 'Estrazione audio', transcribing: 'Trascrizione', cleanup: 'Pulizia della trascrizione' };
+      return job.stage === 'cleanup' ? `${stages.cleanup}…` : `${stages[job.stage] || 'Elaborazione'}… ${job.percent || 0}%`;
     },
 
     async startTranscription() {
@@ -204,7 +217,42 @@ function lessonEditorFactory() {
     onTranscriptionProgress(p) {
       if (p.lessonId !== this.lesson.id) return;
       this.transcriptionJob = { ...this.transcriptionJob, ...p };
-      if (p.state === 'done') this.lesson.transcript = p.transcript;
+      if (p.state === 'done') {
+        this.lesson.transcript = p.transcript;
+        this.lesson.transcript_raw = p.transcript_raw || '';
+        this.lesson.transcript_cleanup = p.transcript_cleanup || '';
+      }
+    },
+
+    // Esito della pulizia salvato con la trascrizione: resta visibile anche riaprendo la lezione.
+    transcriptBadge() {
+      if (!this.lesson.transcript.trim() || !this.lesson.transcript_cleanup) return null;
+      try {
+        return this.badgeFor(JSON.parse(this.lesson.transcript_cleanup), 'transcript');
+      } catch {
+        return null;
+      }
+    },
+
+    // Rimette l'output grezzo di whisper al posto della versione ripulita (si salva con "Salva").
+    restoreOriginalTranscript() {
+      this.lesson.transcript = this.lesson.transcript_raw;
+      this.lesson.transcript_cleanup = '';
+    },
+
+    canRestoreOriginal() {
+      return Boolean(this.lesson.transcript_raw) && this.lesson.transcript !== this.lesson.transcript_raw;
+    },
+
+    // La trascrizione è già "migliorata" solo se tutti i pezzi sono stati ripuliti.
+    knownCleanup() {
+      if (!this.lesson.transcript_cleanup) return null;
+      try {
+        const c = JSON.parse(this.lesson.transcript_cleanup);
+        return c.total > 0 && c.cleaned === c.total ? c : null;
+      } catch {
+        return null;
+      }
     },
 
     async generateAiNotes() {
@@ -212,6 +260,7 @@ function lessonEditorFactory() {
       try {
         const { ai_notes, slidesWarning, slidesNote, transcriptCleanup } = await window.api.ai.generateNotes({
           lessonId: this.lesson.id,
+          knownCleanup: this.knownCleanup(),
           transcript: this.lesson.transcript,
           topic: this.lesson.topic,
         });
