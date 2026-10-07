@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
 const db = require('./db');
+const transcription = require('./transcription');
+const aiNotes = require('./ai-notes');
 
 // Server locale in sola lettura (bind 127.0.0.1) usato dal microservizio esterno
 // "Sylla study-stats" per leggere i dati sempre aggiornati senza export manuale.
@@ -54,6 +56,32 @@ function createWindow() {
   }
 }
 
+// Lavori di trascrizione in corso, per lezione: l'app resta usabile nel frattempo.
+const transcriptionJobs = new Map();
+
+function emitTranscription(lessonId, payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('transcription:progress', { lessonId, ...payload });
+  }
+}
+
+async function runTranscription(lessonId, inputPath) {
+  try {
+    const text = await transcription.transcribeFile({
+      inputPath,
+      settings: db.getSettings(),
+      userDataDir: process.env.SYLLA_DB_PATH ? path.dirname(process.env.SYLLA_DB_PATH) : app.getPath('userData'),
+      onProgress: (p) => emitTranscription(lessonId, { state: 'running', ...p }),
+    });
+    db.setLessonField(lessonId, 'transcript', text);
+    emitTranscription(lessonId, { state: 'done', transcript: text });
+  } catch (err) {
+    emitTranscription(lessonId, { state: 'error', error: err.message });
+  } finally {
+    transcriptionJobs.delete(lessonId);
+  }
+}
+
 function registerIpcHandlers() {
   ipcMain.handle('courses:list', (_e, status) => db.listCourses(status));
   ipcMain.handle('courses:get', (_e, id) => db.getCourse(id));
@@ -67,6 +95,37 @@ function registerIpcHandlers() {
   ipcMain.handle('lessons:listAll', (_e, status) => db.listAllLessons(status));
   ipcMain.handle('lessons:get', (_e, id) => db.getLesson(id));
   ipcMain.handle('lessons:update', (_e, id, input) => db.updateLesson(id, input));
+
+  ipcMain.handle('transcription:check', () => {
+    const { ffmpeg, whisper } = transcription.resolveBinaries(db.getSettings());
+    return { ffmpeg: Boolean(ffmpeg), whisper: Boolean(whisper) };
+  });
+
+  ipcMain.handle('transcription:start', async (_e, lessonId) => {
+    if (transcriptionJobs.has(lessonId)) return { canceled: true, running: true };
+    const win = BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Carica registrazione della lezione',
+      filters: [{ name: 'Audio/Video', extensions: ['mp3', 'm4a', 'wav', 'ogg', 'flac', 'mp4', 'mov', 'mkv', 'webm'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || !filePaths.length) return { canceled: true };
+    transcriptionJobs.set(lessonId, true);
+    runTranscription(lessonId, filePaths[0]);
+    return { canceled: false };
+  });
+
+  ipcMain.handle('transcription:isRunning', (_e, lessonId) => transcriptionJobs.has(lessonId));
+
+  // Usa la trascrizione passata dal modale (può contenere correzioni non ancora salvate).
+  ipcMain.handle('ai:generateNotes', async (_e, { transcript, topic }) => {
+    const ai_notes = await aiNotes.generateNotes({
+      transcript,
+      topic,
+      apiKey: db.getSettings().ai_api_key,
+    });
+    return { ai_notes };
+  });
 
   ipcMain.handle('settings:get', () => db.getSettings());
   ipcMain.handle('settings:set', (_e, key, value) => db.setSetting(key, value));

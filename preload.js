@@ -20,6 +20,15 @@ contextBridge.exposeInMainWorld('api', {
     get: (id) => ipcRenderer.invoke('lessons:get', id),
     update: (id, input) => ipcRenderer.invoke('lessons:update', id, input),
   },
+  transcription: {
+    check: () => ipcRenderer.invoke('transcription:check'),
+    start: (lessonId) => ipcRenderer.invoke('transcription:start', lessonId),
+    isRunning: (lessonId) => ipcRenderer.invoke('transcription:isRunning', lessonId),
+    onProgress: (cb) => ipcRenderer.on('transcription:progress', (_e, payload) => cb(payload)),
+  },
+  ai: {
+    generateNotes: (input) => ipcRenderer.invoke('ai:generateNotes', input),
+  },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (key, value) => ipcRenderer.invoke('settings:set', key, value),
