@@ -20,7 +20,7 @@ function emptyCourseForm() {
 }
 
 function emptyLessonBuffer() {
-  return { id: null, date: '', start_time: '', end_time: '', status: 'programmata', topic: '', notes: '', recording_link: '', materials: [] };
+  return { id: null, date: '', start_time: '', end_time: '', status: 'programmata', topic: '', notes: '', recording_link: '', transcript: '', ai_notes: '', materials: [] };
 }
 
 function startOfWeek(date) {
@@ -57,6 +57,11 @@ function appFactory() {
     allLessons: [],
 
     settings: { footer_text: '', header_image: '' },
+    transcriptionSettings: { whisper_model: 'base', transcription_language: 'it', ai_api_key: '' },
+    transcriptionSettingsMessage: '',
+    binaries: { ffmpeg: true, whisper: true },
+    transcriptionJob: null, // { lessonId, state, stage, percent, error }
+    aiJob: { running: false, error: '' },
     settingsTab: 'personalizzazione',
     footerDraft: '',
     backupMessage: '',
@@ -76,8 +81,10 @@ function appFactory() {
     async init() {
       this.settings = await window.api.settings.get();
       this.footerDraft = this.settings.footer_text || '';
+      this.loadTranscriptionSettings();
       await this.refreshCourses();
       await this.refreshAllLessons();
+      window.api.transcription.onProgress((p) => this.onTranscriptionProgress(p));
     },
 
     async refreshCourses() {
@@ -268,8 +275,11 @@ function appFactory() {
         topic: lesson.topic || '',
         notes: lesson.notes || '',
         recording_link: lesson.recording_link || '',
+        transcript: lesson.transcript || '',
+        ai_notes: lesson.ai_notes || '',
         materials: (lesson.materials || []).map((m) => ({ ...m })),
       };
+      this.aiJob = { running: false, error: '' };
       this.showLessonModal = true;
     },
 
@@ -290,6 +300,67 @@ function appFactory() {
       this.lessons = await window.api.lessons.listByCourse(this.selectedCourse.id);
       await this.refreshAllLessons();
       this.showLessonModal = false;
+    },
+
+    // ---- trascrizione e AI ----
+
+    transcriptionRunningHere() {
+      return this.transcriptionJob && this.transcriptionJob.lessonId === this.editingLesson.id
+        && this.transcriptionJob.state === 'running';
+    },
+
+    transcriptionLabel() {
+      const job = this.transcriptionJob;
+      if (!job || job.lessonId !== this.editingLesson.id) return '';
+      if (job.state === 'error') return job.error;
+      if (job.state !== 'running') return '';
+      const stages = { model: 'Download del modello', audio: 'Estrazione audio', transcribing: 'Trascrizione' };
+      return `${stages[job.stage] || 'Elaborazione'}… ${job.percent || 0}%`;
+    },
+
+    async startTranscription() {
+      this.binaries = await window.api.transcription.check();
+      const result = await window.api.transcription.start(this.editingLesson.id);
+      if (result.canceled) return;
+      this.transcriptionJob = { lessonId: this.editingLesson.id, state: 'running', stage: 'model', percent: 0 };
+    },
+
+    async onTranscriptionProgress(p) {
+      this.transcriptionJob = { ...this.transcriptionJob, ...p };
+      if (p.state === 'done') {
+        if (this.selectedCourse) this.lessons = await window.api.lessons.listByCourse(this.selectedCourse.id);
+        // Il modale aperto sulla stessa lezione riceve subito il testo.
+        if (this.showLessonModal && this.editingLesson.id === p.lessonId) this.editingLesson.transcript = p.transcript;
+      }
+    },
+
+    async generateAiNotes() {
+      this.aiJob = { running: true, error: '' };
+      try {
+        const { ai_notes } = await window.api.ai.generateNotes({
+          transcript: this.editingLesson.transcript,
+          topic: this.editingLesson.topic,
+        });
+        this.editingLesson.ai_notes = ai_notes;
+        this.aiJob = { running: false, error: '' };
+      } catch (err) {
+        this.aiJob = { running: false, error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') };
+      }
+    },
+
+    loadTranscriptionSettings() {
+      this.transcriptionSettings = {
+        whisper_model: this.settings.whisper_model || 'base',
+        transcription_language: this.settings.transcription_language || 'it',
+        ai_api_key: this.settings.ai_api_key || '',
+      };
+    },
+
+    async saveTranscriptionSettings() {
+      for (const [key, value] of Object.entries(this.transcriptionSettings)) {
+        this.settings = await window.api.settings.set(key, value);
+      }
+      this.transcriptionSettingsMessage = 'Impostazioni salvate.';
     },
 
     // ---- calendario ----
@@ -398,6 +469,7 @@ function appFactory() {
         this.backupMessage = 'Database importato correttamente.';
         this.settings = await window.api.settings.get();
         this.footerDraft = this.settings.footer_text || '';
+        this.loadTranscriptionSettings();
         await this.refreshCourses();
         await this.refreshAllLessons();
       }
