@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     listAll: (status) => ipcRenderer.invoke('lessons:listAll', status),
     get: (id) => ipcRenderer.invoke('lessons:get', id),
     update: (id, input) => ipcRenderer.invoke('lessons:update', id, input),
+    updateSlides: (lessonId, slidesPath) => ipcRenderer.invoke('lessons:updateSlides', lessonId, slidesPath),
     onChanged: (cb) => ipcRenderer.on('lessons:changed', (_e, payload) => cb(payload)),
   },
   lessonWindow: {
@@ -30,6 +31,12 @@ contextBridge.exposeInMainWorld('api', {
     start: (lessonId) => ipcRenderer.invoke('transcription:start', lessonId),
     isRunning: (lessonId) => ipcRenderer.invoke('transcription:isRunning', lessonId),
     onProgress: (cb) => ipcRenderer.on('transcription:progress', (_e, payload) => cb(payload)),
+  },
+  dialog: {
+    openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
+  },
+  slides: {
+    open: (lessonId) => ipcRenderer.invoke('slides:open', lessonId),
   },
   ai: {
     generateNotes: (input) => ipcRenderer.invoke('ai:generateNotes', input),

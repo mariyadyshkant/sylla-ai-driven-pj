@@ -76,7 +76,9 @@ function lessonEditorFactory() {
     savedMessage: '',
     binaries: { ffmpeg: true, whisper: true },
     transcriptionJob: null, // { state, stage, percent, error }
-    aiJob: { running: false, error: '' },
+    aiJob: { running: false, error: '', warning: '' },
+    slidesPath: '',
+    slidesError: '',
     aiEditing: false, // false = anteprima formattata (se ci sono note), true = testo Markdown modificabile
 
     async init() {
@@ -96,6 +98,7 @@ function lessonEditorFactory() {
         ai_notes: lesson.ai_notes || '',
         materials: (lesson.materials || []).map((m) => ({ ...m })),
       };
+      this.slidesPath = lesson.slides_path || '';
       document.title = `Lezione ${lesson.date} — ${this.course ? this.course.name : ''}`;
       if (await window.api.transcription.isRunning(id)) {
         this.transcriptionJob = { state: 'running', stage: 'transcribing', percent: 0 };
@@ -107,6 +110,33 @@ function lessonEditorFactory() {
     headerLine() {
       const time = this.lesson.start_time ? `${this.lesson.start_time}–${this.lesson.end_time}` : '';
       return [this.lesson.date, time].filter(Boolean).join('  ·  ');
+    },
+
+    slidesName() {
+      return this.slidesPath.split(/[\\/]/).pop();
+    },
+
+    // Il percorso viene salvato subito (non serve "Salva"): è un allegato, non un testo da rivedere.
+    async attachSlides() {
+      this.slidesError = '';
+      const result = await window.api.dialog.openFile({
+        title: 'Allega slide (PDF)',
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+      if (result.canceled) return;
+      await window.api.lessons.updateSlides(this.lesson.id, result.filePath);
+      this.slidesPath = result.filePath;
+    },
+
+    async openSlides() {
+      const result = await window.api.slides.open(this.lesson.id);
+      this.slidesError = result.opened ? '' : result.error;
+    },
+
+    async removeSlides() {
+      await window.api.lessons.updateSlides(this.lesson.id, null);
+      this.slidesPath = '';
+      this.slidesError = '';
     },
 
     aiPreviewHtml() {
@@ -165,15 +195,16 @@ function lessonEditorFactory() {
     },
 
     async generateAiNotes() {
-      this.aiJob = { running: true, error: '' };
+      this.aiJob = { running: true, error: '', warning: '' };
       try {
-        const { ai_notes } = await window.api.ai.generateNotes({
+        const { ai_notes, slidesWarning } = await window.api.ai.generateNotes({
+          lessonId: this.lesson.id,
           transcript: this.lesson.transcript,
           topic: this.lesson.topic,
         });
         this.lesson.ai_notes = ai_notes;
         this.aiEditing = false;
-        this.aiJob = { running: false, error: '' };
+        this.aiJob = { running: false, error: '', warning: slidesWarning || '' };
       } catch (err) {
         this.aiJob = { running: false, error: String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') };
       }

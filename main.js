@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const db = require('./db');
@@ -99,6 +100,35 @@ function openLessonWindow(lessonId) {
   });
 }
 
+// Visualizzatore PDF delle slide allegate a una lezione (una finestra per lezione).
+const slidesWindows = new Map();
+
+function openSlidesWindow(lessonId, slidesPath) {
+  const existing = slidesWindows.get(lessonId);
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  const win = new BrowserWindow({
+    width: 900,
+    height: 700,
+    minWidth: 520,
+    minHeight: 420,
+    backgroundColor: '#faf8f3',
+    autoHideMenuBar: true,
+    title: `Slide — ${path.basename(slidesPath)}`,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  win.removeMenu();
+  win.loadFile('slides-viewer.html', { query: { path: slidesPath } });
+  slidesWindows.set(lessonId, win);
+  win.on('closed', () => slidesWindows.delete(lessonId));
+}
+
 function emitTranscription(lessonId, payload) {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send('transcription:progress', { lessonId, ...payload });
@@ -168,14 +198,44 @@ function registerIpcHandlers() {
 
   ipcMain.handle('transcription:isRunning', (_e, lessonId) => transcriptionJobs.has(lessonId));
 
-  // Usa la trascrizione passata dal modale (può contenere correzioni non ancora salvate).
-  ipcMain.handle('ai:generateNotes', async (_e, { transcript, topic }) => {
-    const ai_notes = await aiNotes.generateNotes({
+  // Usa la trascrizione passata dalla finestra (può contenere correzioni non ancora salvate);
+  // le slide, se allegate alla lezione, vengono lette dal database.
+  ipcMain.handle('ai:generateNotes', async (_e, { lessonId, transcript, topic }) => {
+    const lesson = lessonId ? db.getLesson(lessonId) : null;
+    const { notes, slidesWarning } = await aiNotes.generateNotes({
       transcript,
       topic,
       apiKey: db.getSettings().ai_api_key,
+      slidesPath: lesson && lesson.slides_path,
     });
-    return { ai_notes };
+    return { ai_notes: notes, slidesWarning };
+  });
+
+  ipcMain.handle('dialog:openFile', async (e, options = {}) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: options.title || 'Seleziona file',
+      filters: options.filters,
+      properties: ['openFile'],
+    });
+    return canceled || !filePaths.length ? { canceled: true } : { canceled: false, filePath: filePaths[0] };
+  });
+
+  // slidesPath = null rimuove l'allegato.
+  ipcMain.handle('lessons:updateSlides', (_e, lessonId, slidesPath) => {
+    const lesson = db.setLessonField(lessonId, 'slides_path', slidesPath || null);
+    broadcast('lessons:changed', { lessonId });
+    return lesson;
+  });
+
+  ipcMain.handle('slides:open', (_e, lessonId) => {
+    const lesson = db.getLesson(lessonId);
+    if (!lesson || !lesson.slides_path) return { opened: false, error: 'Nessuna slide allegata.' };
+    if (!fs.existsSync(lesson.slides_path)) {
+      return { opened: false, error: `File non trovato: ${lesson.slides_path}` };
+    }
+    openSlidesWindow(lessonId, lesson.slides_path);
+    return { opened: true };
   });
 
   ipcMain.handle('settings:get', () => db.getSettings());

@@ -11,7 +11,8 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "better-sqlite3": "^12.9.0"
+    "better-sqlite3": "^12.9.0",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",

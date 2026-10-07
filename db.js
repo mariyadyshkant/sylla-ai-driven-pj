@@ -64,6 +64,7 @@ function migrateLessons() {
   const cols = db.prepare('PRAGMA table_info(lessons)').all().map((c) => c.name);
   if (!cols.includes('transcript')) db.exec("ALTER TABLE lessons ADD COLUMN transcript TEXT DEFAULT ''");
   if (!cols.includes('ai_notes')) db.exec("ALTER TABLE lessons ADD COLUMN ai_notes TEXT DEFAULT ''");
+  if (!cols.includes('slides_path')) db.exec('ALTER TABLE lessons ADD COLUMN slides_path TEXT');
 }
 
 function getDb() {
@@ -272,7 +273,7 @@ function updateLesson(id, input) {
 }
 
 function setLessonField(id, field, value) {
-  if (!['transcript', 'ai_notes'].includes(field)) throw new Error(`Campo non ammesso: ${field}`);
+  if (!['transcript', 'ai_notes', 'slides_path'].includes(field)) throw new Error(`Campo non ammesso: ${field}`);
   getDb().prepare(`UPDATE lessons SET ${field} = ? WHERE id = ?`).run(value, id);
   return getLesson(id);
 }
