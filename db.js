@@ -193,6 +193,14 @@ function generateLessons(courseId) {
   const end = new Date(course.end_date + 'T00:00:00');
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return;
 
+  // Le lezioni svolte non vengono mai toccate né duplicate: salta le occorrenze già coperte.
+  const completed = new Set(
+    getDb()
+      .prepare("SELECT date, start_time FROM lessons WHERE course_id = ? AND status = 'svolta'")
+      .all(courseId)
+      .map((l) => `${l.date}|${l.start_time}`)
+  );
+
   const insert = getDb().prepare(
     `INSERT INTO lessons (course_id, date, start_time, end_time, status) VALUES (?, ?, ?, ?, 'programmata')`
   );
@@ -201,7 +209,7 @@ function generateLessons(courseId) {
   while (cursor <= end) {
     const weekday = cursor.getDay(); // 0=domenica ... 6=sabato
     for (const slot of slots) {
-      if (Number(slot.weekday) === weekday) {
+      if (Number(slot.weekday) === weekday && !completed.has(`${toLocalISODate(cursor)}|${slot.start_time}`)) {
         insert.run(courseId, toLocalISODate(cursor), slot.start_time, slot.end_time);
       }
     }
