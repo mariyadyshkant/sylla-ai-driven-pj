@@ -1,36 +1,50 @@
 flowchart LR
-  App["Electron App Shell"]
-  UI["UI: HTML/Tailwind/Alpine.js"]
-  Main["Electron Main Process / Node.js"]
-  DB["SQLite (better-sqlite3)"]
-  Whisper["whisper.cpp + ffmpeg"]
-  AI["API AI esterna opzionale"]
-  Storage["Local filesystem"]
+  Win["Finestra principale<br/>index.html + renderer.js"]
+  LessonWin["Finestra lezione<br/>lesson.html + lesson.js"]
+  SlidesWin["Visualizzatore slide<br/>slides-viewer.html"]
+  Preload["preload.js<br/>ponte IPC (window.api)"]
+  Main["Electron Main Process<br/>main.js / Node.js"]
+  DB["SQLite (better-sqlite3)<br/>db.js"]
+  Whisper["whisper.cpp + ffmpeg<br/>transcription.js"]
+  Pdf["pdf-parse<br/>testo delle slide"]
+  AI["API Claude (Haiku 4.5)<br/>ai-notes.js: pulizia e note"]
+  Stats["Endpoint study-stats<br/>127.0.0.1:4174"]
+  StatsSvc["sylla-study-stats<br/>microservizio esterno"]
+  Storage["Filesystem locale<br/>database, modelli whisper, PDF"]
 
-  App --> UI
-  App --> Main
+  Win --> Preload
+  LessonWin --> Preload
+  Preload --> Main
   Main --> DB
-  Main --> Storage
   Main --> Whisper
+  Main --> Pdf
   Main --> AI
-  UI --> Main
-  UI --> Whisper
-  UI --> DB
+  Main --> Stats
+  Main --> SlidesWin
+  Main --> LessonWin
+  Stats --> StatsSvc
+  DB --> Storage
+  Whisper --> Storage
+  Pdf --> Storage
+  SlidesWin --> Storage
 
   subgraph Desktop App
-    App
-    UI
+    Win
+    LessonWin
+    SlidesWin
+    Preload
     Main
   end
 
   subgraph Local Processing
+    DB
     Whisper
+    Pdf
     Storage
+    Stats
   end
 
   subgraph External Services
     AI
+    StatsSvc
   end
-
-  DB --> Storage
-  Whisper --> Storage

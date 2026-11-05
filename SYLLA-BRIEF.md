@@ -1,7 +1,7 @@
 # Brief di progetto — Sylla
 
 > App desktop per il tracciamento delle lezioni dei corsi seguiti.
-> Stato: documento vivo, aggiornato man mano che si definiscono le schermate. Le sezioni 1-5 sono decisioni "blindate". La sezione 6 è in definizione.
+> Stato: documento vivo, allineato all'implementazione al 2026-10-07. Le sezioni 1-5 sono decisioni "blindate"; la sezione 6 descrive le schermate così come sono state realizzate.
 
 ## 1. Obiettivo
 
@@ -13,8 +13,9 @@ App desktop personale per tenere traccia delle lezioni dei corsi seguiti (attual
 - **Tailwind CSS** — stessa libreria usata nel progetto piante
 - **Alpine.js** — reattività leggera, niente framework pesanti
 - **SQLite** (`better-sqlite3`) — storage locale su file
-- **whisper.cpp** (modello "base" o "small", bundled) + **ffmpeg** — trascrizione locale offline, gratuita
-- Chiamata a un'API AI esterna (es. Claude) solo per l'elaborazione opzionale della trascrizione in note — richiede una API key personale, costo minimo per chiamata
+- **whisper.cpp** (modelli tiny, base, small o medium, scaricati al primo utilizzo) + **ffmpeg** — trascrizione locale offline, gratuita. I binari non sono inclusi nell'app: vengono cercati nel sistema (`PATH`, cartelle di Homebrew) o indicati con variabili d'ambiente
+- **pdf-parse** — estrazione locale del testo dalle slide PDF allegate alle lezioni, in JavaScript e senza binari esterni
+- Chiamata a un'API AI esterna (**Claude Haiku**) solo per la pulizia della trascrizione e per l'elaborazione opzionale in note — richiede una API key personale, costo minimo per chiamata
 
 ## 3. Modello dati
 
@@ -43,8 +44,9 @@ CRUD completo: corsi aggiungibili/modificabili/eliminabili liberamente, in vista
 | materiali e link             | slide, dispense — lista, non singolo campo                            |
 | note libere                  | testo libero                                                          |
 | link alla registrazione      | solo riferimento, non usato per download automatico                   |
-| trascrizione                 | generata localmente da file caricato                                  |
-| note elaborate (AI)          | generate su richiesta dalla trascrizione                              |
+| slide (PDF)                  | percorso di un PDF allegato, aperto in una finestra separata (vedi 5b) |
+| trascrizione                 | generata localmente da file caricato, poi ripulita con Haiku (vedi 5) |
+| note elaborate (AI)          | generate su richiesta dalla trascrizione e dalle slide                |
 
 ## 4. Generazione automatica del calendario
 
@@ -56,10 +58,21 @@ Il download automatico dal link alla registrazione non è previsto (richiederebb
 
 1. Caricamento manuale del file audio/video della lezione registrata
 2. Estrazione audio (ffmpeg) e trascrizione locale (whisper.cpp) — gratis, offline
-3. Trascrizione salvata come testo nella lezione
-4. Pulsante opzionale "Elabora in note": invia la trascrizione a un'API AI per generare un riassunto strutturato (richiede API key propria, costo minimo)
+3. Pulizia con Claude Haiku (solo se è configurata una API key): aggiunge punteggiatura, divide in paragrafi e corregge gli errori di riconoscimento evidenti, senza cambiare il contenuto. Lavora a pezzi, scarta un risultato troppo diverso dall'originale (riassunto o troncamento) e, se fallisce, lascia il testo grezzo
+4. Trascrizione salvata come testo nella lezione: il testo migliorato prende il posto di quello grezzo, un badge "trascrizione migliorata" lo segnala e l'output originale di whisper resta conservato ("Ripristina originale"). Senza API key resta il testo grezzo, interamente locale
+5. Pulsante opzionale "Elabora in note": invia la trascrizione (e, se allegate, le slide — vedi 5b) a un'API AI per generare un riassunto strutturato (richiede API key propria, costo minimo). Se la trascrizione non risulta già migliorata, la pulizia avviene in quel momento, solo come contesto e senza salvarla
 
 Eventuale miglioria futura: tentare il download automatico dal link, valutato piattaforma per piattaforma.
+
+## 5b. Flusso slide PDF
+
+Ogni lezione può avere un PDF di slide allegato. Flusso scelto:
+
+1. Pulsante "Allega slide (PDF)" nella finestra della lezione: si sceglie il file con un dialog di sistema
+2. Nel database si salva solo il percorso del file (`slides_path`), non una copia: la lezione mostra il nome del file con "Apri slide", "Cambia" e "Rimuovi"
+3. "Apri slide" apre una finestra separata di 900×700 (`slides-viewer.html`) con il visualizzatore PDF integrato
+4. Alla generazione delle note, il testo viene estratto in locale con `pdf-parse` (fino a 60.000 caratteri) e aggiunto al prompt dell'AI dopo la trascrizione, con il prefisso `CONTENUTO SLIDE`
+5. Se il PDF è fatto di immagini e non ha testo (per esempio una scansione), viene inviato all'API come documento (fino a 100 pagine e 20 MB); se è troppo grande o non si riesce a leggere, le note si generano dalla sola trascrizione e compare un avviso. Se il file è stato spostato, "Apri slide" lo segnala
 
 ## 6. Schermate
 
@@ -101,13 +114,12 @@ Layout a tre zone, ispirato a un mockup Canva fornito da Mariya:
 ### 6.4 Lezioni del corso — DEFINITA
 
 - Lista organizzata per settimana: ogni settimana ha un'intestazione "Settimana N" con una linea sottostante
-- Sotto ogni intestazione, riquadri rettangolari in riga (stile riquadri del calendario ma più grandi, angoli leggermente arrotondati), uno per lezione, con il numero della lezione al centro
-- Il colore del riquadro indica lo stato della lezione (stessa logica a colori già usata in "How's my plant?"):
-  - Programmata (futura, non ancora svolta) — colore di default
-  - Passata ma non compilata (la data è passata ma non è stato inserito nulla) — colore diverso, segnala che va compilata
-  - Svolta e compilata — terzo colore
-  - Palette esatta da definire in fase di styling
-- Cliccando un riquadro si apre il **form di compilazione lezione** come modale sopra la lista (vedi prossima sotto-schermata)
+- Sotto ogni intestazione, riquadri di circa 200×120 px con angoli arrotondati, uno per lezione, in ordine di data. Ogni riquadro mostra: il **numero della lezione** (grande, in alto a sinistra, progressivo su tutto il corso e non per settimana), la **data** (es. "MER 16 SET"), l'**argomento** troncato a 2 righe con puntini di sospensione, oppure il testo grigio "Lezione non ancora compilata" se manca
+- Lo stato è indicato da un bordo sinistro e da un pallino colorati, con uno sfondo leggermente tinto (passando il mouse compare la dicitura dello stato):
+  - Programmata (futura, non ancora svolta) — grigio
+  - Passata ma non compilata (la data è passata e la lezione non è stata segnata come svolta) — ambra, segnala che va compilata
+  - Svolta e compilata — verde
+- Cliccando un riquadro si apre il **form di compilazione lezione** in una finestra separata (vedi prossima sotto-schermata)
 
 ### 6.5 Form "+ Aggiungi corso" — DEFINITA
 
@@ -131,9 +143,10 @@ Layout a tre zone, ispirato a un mockup Canva fornito da Mariya:
 Organizzata con tab/menu interno in tre sezioni:
 
 1. **Trascrizione e AI**
-   - Dimensione modello whisper: scelta tra più dimensioni (es. veloce/meno precisa vs lenta/più precisa)
-   - Lingua di trascrizione predefinita (es. italiano, inglese, rilevamento automatico)
-   - API key per l'elaborazione AI delle trascrizioni (campo mascherato)
+   - Dimensione modello whisper: tiny, base, small o medium (dal più veloce e meno preciso al più lento e preciso); il modello si scarica al primo utilizzo
+   - Lingua di trascrizione predefinita: italiano, inglese o rilevamento automatico. Va scelta in base all'audio: con una lingua sbagliata whisper produce testo senza senso
+   - API key per la pulizia della trascrizione e per le note AI (campo mascherato). È salvata in chiaro nel database locale, quindi finisce anche nei backup esportati
+   - I percorsi di ffmpeg e whisper.cpp non hanno un campo: si indicano con variabili d'ambiente o con le chiavi `ffmpeg_path` e `whisper_path` del database
 2. **Personalizzazione**
    - Frase del footer: campo testo modificabile manualmente — la nuova frase sostituisce quella precedente, nessuna rotazione automatica
    - Immagine di sfondo dell'header: upload di un'immagine mostrata dietro al titolo "Sylla" — caricandone una nuova sostituisce la precedente
@@ -142,25 +155,26 @@ Organizzata con tab/menu interno in tre sezioni:
 
 ### 6.8 Form di compilazione lezione — DEFINITA
 
-Modale che si apre cliccando un riquadro lezione da "Lezioni del corso".
+Finestra Electron separata (800×700, ridimensionabile, stile blocco note: sfondo chiaro, campi in colonna a piena larghezza senza card né bordi, testo in serif o monospace) che si apre cliccando un riquadro lezione da "Lezioni del corso". Per ogni lezione c'è una sola finestra: cliccarla di nuovo porta in primo piano quella aperta.
 
-- **Intestazione**: data/ora della lezione, interruttore "Segna come svolta" (passaggio da _programmata_ a _svolta_ — manuale, non automatico)
+- **Intestazione fissa**: nome del corso, data/ora della lezione, interruttore "Segna come svolta" (passaggio da _programmata_ a _svolta_ — manuale, non automatico)
+- **Slide** (riga fissa sotto l'intestazione): "Allega slide (PDF)"; con un PDF allegato si vedono il nome del file, "Apri slide" (finestra separata 900×700, vedi 5b), "Cambia" e "Rimuovi". L'allegato si salva subito, senza premere "Salva"
 - **Argomento/contenuti trattati**: testo libero
 - **Materiali e link**: lista con pulsante "+ Aggiungi materiale" (stessa logica degli slot orari del corso)
 - **Note libere**: testo libero
 - **Link alla registrazione**: campo testo/URL, solo riferimento
 - **Trascrizione**:
-  - Pulsante "Carica file audio/video" → estrazione audio (ffmpeg) + trascrizione locale (whisper.cpp) in background, con indicatore di avanzamento — si può continuare a usare l'app nel frattempo
-  - Una volta pronta, il testo della trascrizione è mostrato in un campo editabile (per correggere eventuali errori del modello)
+  - Pulsante "Carica file audio/video" → estrazione audio (ffmpeg) + trascrizione locale (whisper.cpp) in background, con indicatore di avanzamento (poi "Pulizia della trascrizione…" se c'è una API key) — si può continuare a usare l'app nel frattempo
+  - Una volta pronta, il testo è mostrato in un campo editabile (per correggere eventuali errori del modello), con un badge che indica se è stato migliorato e, se sì, il link "Ripristina originale"
 - **Note elaborate (AI)**:
-  - Pulsante "Elabora in note" (attivo solo se esiste una trascrizione) → invia la trascrizione a un'API AI esterna per generare un riassunto strutturato
-  - Risultato mostrato in un campo editabile
-- Pulsanti Salva / Annulla per chiudere il modale
+  - Pulsante "Elabora in note" (attivo solo se esiste una trascrizione) → invia la trascrizione e, se allegate, le slide a un'API AI esterna per generare note strutturate; sotto compaiono eventuali avvisi o note sulle slide
+  - Il risultato è mostrato formattato (titoli, elenchi, grassetti); il pulsante "Modifica" passa al testo Markdown editabile e "Anteprima" torna alla vista formattata
+- Pulsanti fissi **Salva** (salva senza chiudere e aggiorna la lista nella finestra principale) e **Chiudi** (chiude scartando le modifiche non salvate)
 
 ---
 
 ## Brief completo
 
-Tutte le schermate sono state definite. Prossimo passo: impostare la struttura del progetto Electron e iniziare l'implementazione, partendo dal modello dati (migrazioni SQLite) e dalla dashboard.
+Tutte le schermate sono state definite e realizzate: l'app è funzionante e coperta da test end-to-end. Lo stato delle singole feature è nei piani in `.specs/plans/`, le decisioni nell'`ADR.md`.
 
-_Sezione aggiornata via via che si definiscono le schermate._
+_Sezione allineata all'implementazione al 2026-10-07._

@@ -26,4 +26,4 @@ Calcolare le ricorrenze settimanali tra data inizio e data fine e generare le le
 [x] Completata
 
 Completata il: 2026-09-11
-Note: `db.js#generateLessons` calcola le occorrenze settimanali tra `start_date`/`end_date` per ogni slot ricorrente; invocata da `createCourse` e `updateCourse`. Le lezioni `programmata` vengono rigenerate ad ogni modifica del periodo/slot; le lezioni `svolta` non vengono mai toccate. Coperta dai test `tests/generazione-calendario.spec.js`.
+Note: `db.js#generateLessons` calcola le occorrenze settimanali tra `start_date`/`end_date` per ogni slot ricorrente; invocata da `createCourse` e `updateCourse`. Le lezioni `programmata` vengono rigenerate ad ogni modifica del periodo/slot; le lezioni `svolta` non vengono mai toccate né duplicate: le occorrenze che hanno già una lezione svolta (stessa data e ora di inizio) vengono saltate (correzione del 2026-10-07, prima ogni salvataggio lasciava un doppione vuoto accanto alle lezioni svolte). Coperta dai test `tests/generazione-calendario.spec.js`.
