@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const db = require('./db');
+const db = require('../db');
 
 // Nei test (e negli script di verifica) le finestre restano invisibili e non rubano il focus,
 // altrimenti ogni avvio fa lampeggiare lo schermo e blocca l'uso del computer.
@@ -12,8 +12,8 @@ const windowDefaults = {
   // una finestra nascosta non deve essere "rallentata" dal browser, o gli screenshot e i test si bloccano
   webPreferences: { backgroundThrottling: !hideWindows },
 };
-const transcription = require('./transcription');
-const aiNotes = require('./ai-notes');
+const transcription = require('../transcription');
+const aiNotes = require('../ai-notes');
 
 // Server locale in sola lettura (bind 127.0.0.1) usato dal microservizio esterno
 // "Sylla study-stats" per leggere i dati sempre aggiornati senza export manuale.
