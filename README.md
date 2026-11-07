@@ -27,7 +27,6 @@ Le sezioni sono descritte nel dettaglio in [`SYLLA-BRIEF.md`](SYLLA-BRIEF.md): m
 - **Slide PDF allegate** — "Allega slide (PDF)" collega un PDF alla lezione (nel database resta solo il percorso del file) e "Apri slide" lo mostra in una finestra separata. Quando si generano le note, il testo delle slide (fino a 60.000 caratteri) viene aggiunto al contesto dell'AI. Se il PDF è fatto di immagini e non ha testo (per esempio una scansione), viene inviato all'AI come documento (fino a 100 pagine e 20 MB); se è troppo grande o non si riesce a leggere, le note si generano comunque dalla sola trascrizione e compare un avviso.
 - **Note AI** — "Elabora in note" genera note strutturate dalla trascrizione (già migliorata) e dalle slide, se allegate. Se la trascrizione non è stata ripulita al caricamento (nessuna chiave in quel momento, pulizia fallita, testo scritto a mano), la pulizia avviene in quel momento, solo come contesto e senza modificare il testo salvato. Le note sono mostrate formattate e restano modificabili.
 - **Impostazioni e backup** — modello whisper e lingua, API key, frase del footer e immagine dell'header, esportazione e importazione del database.
-- **Statistiche di studio** — endpoint locale in sola lettura per il microservizio esterno (vedi sotto).
 
 ## Come installare
 
@@ -45,38 +44,38 @@ npm start       # avvia l'app
 
 ## Scelte tecniche
 
-| Scelta | Perché |
-|---|---|
-| Electron | UI desktop cross-platform, riuso di competenze HTML/CSS/JS |
-| Tailwind CSS + Alpine.js | Reattività leggera senza un framework pesante |
-| SQLite (`better-sqlite3`) | Storage locale su file, coerente con un'app single-user senza server |
-| whisper.cpp + ffmpeg | Trascrizione locale, gratuita, offline |
-| `pdf-parse` | Estrazione locale del testo dalle slide PDF, in JavaScript e senza binari esterni |
-| API Claude (Haiku 4.5) | Pulizia della trascrizione e generazione delle note: un modello veloce ed economico per entrambi i passaggi, usato solo su richiesta |
+| Scelta                    | Perché                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Electron                  | UI desktop cross-platform, riuso di competenze HTML/CSS/JS                                                                           |
+| Tailwind CSS + Alpine.js  | Reattività leggera senza un framework pesante                                                                                        |
+| SQLite (`better-sqlite3`) | Storage locale su file, coerente con un'app single-user senza server                                                                 |
+| whisper.cpp + ffmpeg      | Trascrizione locale, gratuita, offline                                                                                               |
+| `pdf-parse`               | Estrazione locale del testo dalle slide PDF, in JavaScript e senza binari esterni                                                    |
+| API Claude (Haiku 4.5)    | Pulizia della trascrizione e generazione delle note: un modello veloce ed economico per entrambi i passaggi, usato solo su richiesta |
 
 Le decisioni e le alternative valutate sono in [`ADR.md`](ADR.md); il flusso agente/documento in [`AGENT-FLOW.md`](AGENT-FLOW.md) e [`AGENT.md`](AGENT.md).
 
 ## Struttura del repository
 
-| File | Contenuto |
-|---|---|
-| `main.js` | Processo principale Electron: finestre, handler IPC, avvio della trascrizione, server locale per study-stats |
-| `preload.js` | Ponte sicuro (`window.api`) tra le finestre e il processo principale |
-| `db.js` | Schema SQLite, migrazioni, accesso ai dati, generazione del calendario |
-| `transcription.js` | Pipeline ffmpeg → whisper.cpp, ricerca dei binari, download dei modelli |
-| `ai-notes.js` | Chiamate all'API Claude: pulizia della trascrizione, contesto delle slide, generazione delle note |
-| `index.html`, `renderer.js` | Finestra principale: sidebar, dashboard, corsi, lezioni, impostazioni |
-| `lesson.html`, `lesson.js` | Finestra di compilazione della lezione |
-| `slides-viewer.html` | Finestra che mostra il PDF delle slide |
-| `tests/` | Test end-to-end Playwright, con helper e PDF di prova in `tests/fixtures/` |
-| `.specs/plans/` | Piani di feature con stato di avanzamento |
-| `SYLLA-BRIEF.md`, `ADR.md`, `DEMO-SCRIPT.md` | Brief di progetto, decisioni architetturali, scaletta per il Demo Day |
+| File                                         | Contenuto                                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `main.js`                                    | Processo principale Electron: finestre, handler IPC, avvio della trascrizione, server locale per study-stats |
+| `preload.js`                                 | Ponte sicuro (`window.api`) tra le finestre e il processo principale                                         |
+| `db.js`                                      | Schema SQLite, migrazioni, accesso ai dati, generazione del calendario                                       |
+| `transcription.js`                           | Pipeline ffmpeg → whisper.cpp, ricerca dei binari, download dei modelli                                      |
+| `ai-notes.js`                                | Chiamate all'API Claude: pulizia della trascrizione, contesto delle slide, generazione delle note            |
+| `index.html`, `renderer.js`                  | Finestra principale: sidebar, dashboard, corsi, lezioni, impostazioni                                        |
+| `lesson.html`, `lesson.js`                   | Finestra di compilazione della lezione                                                                       |
+| `slides-viewer.html`                         | Finestra che mostra il PDF delle slide                                                                       |
+| `tests/`                                     | Test end-to-end Playwright, con helper e PDF di prova in `tests/fixtures/`                                   |
+| `.specs/plans/`                              | Piani di feature con stato di avanzamento                                                                    |
+| `SYLLA-BRIEF.md`, `ADR.md`, `DEMO-SCRIPT.md` | Brief di progetto, decisioni architetturali, scaletta per il Demo Day                                        |
 
-## Un secondo componente: statistiche di studio
+## Prossimi sviluppi
 
-Accanto all'app principale c'è un microservizio indipendente, **[sylla-study-stats](https://github.com/mariyadyshkant/sylla-study-stats)**, che interroga l'endpoint locale esposto da Sylla (`GET /api/v1/study-stats` su `127.0.0.1:4174`, raggiungibile solo dalla stessa macchina) per calcolare quanto tempo è stato effettivamente dedicato allo studio, corso per corso, e mostrarlo in una dashboard dedicata (Python/FastAPI containerizzato).
+**Pannello di ripasso** — uno spazio dedicato allo studio, in cui un modello AI genererebbe a partire dalle lezioni (trascrizione, note e slide) delle flashcard e delle domande a scelta multipla per ripassare gli argomenti di un corso. Come per le note, sarebbe un'azione a scelta e non automatica, basata sulla stessa API key personale.
 
 ## Autrice
 
 Mariya Dyshkant
-[Portfolio](https://mariyadyshkant.com) · [LinkedIn](https://linkedin.com/in/mariya-dyshkant-45bb411ba)
+[Portfolio](https://mariyadyshkant.com) · [LinkedIn](https://linkedin.com/in/mariya-dyshkant/)
